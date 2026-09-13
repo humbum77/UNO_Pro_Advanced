@@ -1,0 +1,25 @@
+{
+  "baseline": "v1.64 FIX2",
+  "unchanged_runtime_modules": [
+    "data_model.py",
+    "hardware_seq_0x29.py",
+    "main.py",
+    "midi_engine.py",
+    "midi_interface.py",
+    "protocol_map.py",
+    "state_decoder.py",
+    "unosyp_seq_decoder.py",
+    "unosyp_state_decoder.py"
+  ],
+  "unchanged_App_methods": [
+    "play_indicator",
+    "_autofit_sequence_note_view",
+    "draw_keyboard",
+    "_keyboard_octave",
+    "store_locked",
+    "deploy_locked",
+    "_clock_master_start",
+    "_clock_master_stop",
+    "_clock_master_tick"
+  ]
+}

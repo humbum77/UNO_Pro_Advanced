@@ -1,0 +1,244 @@
+Binary files /mnt/data/uno_v161_original/UNO_Pro_Advanced_v1.61/__pycache__/app.cpython-313.pyc and /mnt/data/uno_v161_src/UNO_Pro_Advanced_v1.61/__pycache__/app.cpython-313.pyc differ
+Binary files /mnt/data/uno_v161_original/UNO_Pro_Advanced_v1.61/__pycache__/data_model.cpython-313.pyc and /mnt/data/uno_v161_src/UNO_Pro_Advanced_v1.61/__pycache__/data_model.cpython-313.pyc differ
+Binary files /mnt/data/uno_v161_original/UNO_Pro_Advanced_v1.61/__pycache__/hardware_seq_0x29.cpython-313.pyc and /mnt/data/uno_v161_src/UNO_Pro_Advanced_v1.61/__pycache__/hardware_seq_0x29.cpython-313.pyc differ
+Binary files /mnt/data/uno_v161_original/UNO_Pro_Advanced_v1.61/__pycache__/midi_engine.cpython-313.pyc and /mnt/data/uno_v161_src/UNO_Pro_Advanced_v1.61/__pycache__/midi_engine.cpython-313.pyc differ
+Binary files /mnt/data/uno_v161_original/UNO_Pro_Advanced_v1.61/__pycache__/protocol_map.cpython-313.pyc and /mnt/data/uno_v161_src/UNO_Pro_Advanced_v1.61/__pycache__/protocol_map.cpython-313.pyc differ
+Binary files /mnt/data/uno_v161_original/UNO_Pro_Advanced_v1.61/__pycache__/state_decoder.cpython-313.pyc and /mnt/data/uno_v161_src/UNO_Pro_Advanced_v1.61/__pycache__/state_decoder.cpython-313.pyc differ
+Binary files /mnt/data/uno_v161_original/UNO_Pro_Advanced_v1.61/__pycache__/storage.cpython-313.pyc and /mnt/data/uno_v161_src/UNO_Pro_Advanced_v1.61/__pycache__/storage.cpython-313.pyc differ
+Binary files /mnt/data/uno_v161_original/UNO_Pro_Advanced_v1.61/__pycache__/unosyp_seq_decoder.cpython-313.pyc and /mnt/data/uno_v161_src/UNO_Pro_Advanced_v1.61/__pycache__/unosyp_seq_decoder.cpython-313.pyc differ
+Binary files /mnt/data/uno_v161_original/UNO_Pro_Advanced_v1.61/__pycache__/unosyp_state_decoder.cpython-313.pyc and /mnt/data/uno_v161_src/UNO_Pro_Advanced_v1.61/__pycache__/unosyp_state_decoder.cpython-313.pyc differ
+diff -ruN /mnt/data/uno_v161_original/UNO_Pro_Advanced_v1.61/app.py /mnt/data/uno_v161_src/UNO_Pro_Advanced_v1.61/app.py
+--- /mnt/data/uno_v161_original/UNO_Pro_Advanced_v1.61/app.py	2026-09-11 13:43:37.000000000 +0000
++++ /mnt/data/uno_v161_src/UNO_Pro_Advanced_v1.61/app.py	2026-09-11 22:46:24.924026309 +0000
+@@ -14,6 +14,7 @@
+ from protocol_map import *
+ from state_decoder import decode_state_0x37
+ from unosyp_state_decoder import decode_0x37_raw,decode_extended_preset_fields
++from hardware_seq_0x29 import parse_0x29_response,apply_to_sequence
+ 
+ MATRIX_SOURCES=['Velocity','Mod Wheel','Aftertouch','Key Pitch','Key Gate','Osc 1 Tune','Osc 1 Level','Osc 2 Tune','Osc 2 Level','Osc 3 Tune','Osc 3 Level','Noise','Filter 1 Cutoff','Filter 1 Res','Filter 2 Cutoff','Filter 2 Res','Filter Spacing','LFO 1','LFO 1 Fade In','LFO 2','LFO 2 Fade In','Filter Env','Amp Env','CV 1 IN','GATE 1 IN','CV 2 IN','GATE 2 IN','Accent','Gate','Tie']
+ MATRIX_DESTINATIONS=['OFF','Osc 1 Tune','Osc 1 Wave','Osc 1 Level','Osc 2 Tune','Osc 2 Wave','Osc 2 Level','Osc 2 FM Amount','Osc 3 Tune','Osc 3 Wave','Osc 3 Level','Osc 3 FM Amount','Noise level','Filter 1 Cutoff','Filter 1 Res','Filter 2 Cutoff','Filter 2 Res','Filter Spacing','LFO 1 Wave','LFO 1 Rate','LFO 2 Wave','LFO 2 Rate','Filter 1 Env Amount','Filter 2 Env Amount','Amp Env Amount','Drive Amount','Delay Amount','Reverb Amount','Mod Amount','CV OUT 1','GATE OUT 1','CV OUT 2','GATE OUT 2','Accent Amount']+[f'Mod {i} Amount' for i in range(1,17)]
+@@ -31,7 +32,7 @@
+   self.canvas=tk.Canvas(self,bg=BG,highlightthickness=0);self.canvas.pack(fill='both',expand=True)
+   self.settings=storage.load_settings();self.settings.setdefault('preview',True);self.settings.setdefault('ui_scale','100%');self.settings_dirty=False;self._applied_settings=copy.deepcopy(self.settings);self.keyboard_visible=bool(self.settings.get('keyboard_visible',False));self.page='SYNTH';self._apply_ui_scale(self.settings.get('ui_scale','100%'),save=False)
+   self.song_mode='SONG';self.preset=Preset();self.song=Song();self.selected_song_file=None
+-  self.scale=1;self.ox=0;self.oy=0;self.hit=[];self.drag=None;self.popup=None;self.status='OFFLINE';self._closing=False;self._graph_images=[];self.selected_seq_step=0;self.selected_seq_note=None;self.seq_visible=16;self.seq_hscroll=0;self.seq_note_low=36;self.seq_param='GATE';self.seq_mod=0;self.seq_overdub='MONO';self.seq_resolution='1/16';self.seq_timing='STRAIGHT';self.seq_swing=0;self.seq_clipboard=None;self.selected_song_slot=0;self.selected_live_slot=0;self.song_preset_folder=storage.PRESETS;self.song_folder_scroll=0;self.live_slots=(list(self.settings.get('live_slots',[]))[:64]+[None]*64)[:64];self.lib_category='All';self.lib_query='';self.lib_selected=None;self.hardware_selected=1;self.settings.setdefault('preview',True);self.preview=bool(self.settings.get('preview',True));self.preset_source='HARDWARE';self.preset_folder=None;self.lib_panel_source=['LOCAL','UNO'];self.lib_panel_folder=[storage.PRESETS,None];self.lib_scroll=[0,0];self.lib_hscroll=[0,0];self.lib_expanded=set();self.lib_star_filter=False;self.lib_color_filters=set();self.lib_right_mode='UNO';self.lib_right_folder=None;self._lib_folder_entry=None;self._lib_folder_entry_window=None;self._lib_tooltip_job=None;self._lib_tooltip=None;self._mod_tooltip_job=None;self._mod_tooltip=None;self.keys_down=set();self.hw_keys_down=set();self.pitch_visual=0;self.open_dropdown=None;self.dropdown_scroll=0;self.dropdown_hover=None;self._lib_search_entry=None;self._lib_clipboard=None;self._lib_folder_clipboard=None;self._lib_drag_origin=None;self._lib_drag_started=False;self._lib_drag_pos=None;self.lib_focus=0;self.song_tree_expanded={str(storage.PRESETS)};self.song_tree_selected=storage.PRESETS;self.matrix_scroll=0;self.seq_playing=False;self.seq_recording=False;self.seq_record_step=0;self._seq_clock_count=0;self.arp_on=False;self._seq_active_notes=set();self._seq_noteoff_jobs={};self._seq_last_clock_time=None;self._seq_clock_interval=0.020833;self._rx_bank=0;self.hardware_names={};self._catalog_slot=0;self._catalog_active=False;self._catalog_job=None;self._catalog_timeout_job=None;self._catalog_retry=0;self._hw_refresh_job=None;self._hw_name_job=None;self._last_state_dump=None;self.sequence_origin='HARDWARE_STATE_ONLY';self.live_delay=int(self.settings.get('live_delay',0));self.live_playing=False;self.live_countdown_remaining=0;self._live_countdown_job=None
++  self.scale=1;self.ox=0;self.oy=0;self.hit=[];self.drag=None;self.popup=None;self.status='OFFLINE';self._closing=False;self._graph_images=[];self.selected_seq_step=0;self.selected_seq_note=None;self.seq_visible=16;self.seq_hscroll=0;self.seq_note_low=36;self.seq_param='GATE';self.seq_mod=0;self.seq_overdub='MONO';self.seq_resolution='1/16';self.seq_timing='STRAIGHT';self.seq_swing=0;self.seq_clipboard=None;self.selected_song_slot=0;self.selected_live_slot=0;self.song_preset_folder=storage.PRESETS;self.song_folder_scroll=0;self.live_slots=(list(self.settings.get('live_slots',[]))[:64]+[None]*64)[:64];self.lib_category='All';self.lib_query='';self.lib_selected=None;self.hardware_selected=1;self.settings.setdefault('preview',True);self.preview=bool(self.settings.get('preview',True));self.preset_source='HARDWARE';self.preset_folder=None;self.lib_panel_source=['LOCAL','UNO'];self.lib_panel_folder=[storage.PRESETS,None];self.lib_scroll=[0,0];self.lib_hscroll=[0,0];self.lib_expanded=set();self.lib_star_filter=False;self.lib_color_filters=set();self.lib_right_mode='UNO';self.lib_right_folder=None;self._lib_folder_entry=None;self._lib_folder_entry_window=None;self._lib_tooltip_job=None;self._lib_tooltip=None;self._mod_tooltip_job=None;self._mod_tooltip=None;self.keys_down=set();self.hw_keys_down=set();self.pitch_visual=0;self.open_dropdown=None;self.dropdown_scroll=0;self.dropdown_hover=None;self._lib_search_entry=None;self._lib_clipboard=None;self._lib_folder_clipboard=None;self._lib_drag_origin=None;self._lib_drag_started=False;self._lib_drag_pos=None;self.lib_focus=0;self.song_tree_expanded={str(storage.PRESETS)};self.song_tree_selected=storage.PRESETS;self.matrix_scroll=0;self.seq_playing=False;self.seq_recording=False;self.seq_record_step=0;self._seq_clock_count=0;self.arp_on=False;self._seq_active_notes=set();self._seq_noteoff_jobs={};self._seq_last_clock_time=None;self._seq_clock_interval=0.020833;self._rx_bank=0;self.hardware_names={};self._catalog_slot=0;self._catalog_active=False;self._catalog_job=None;self._catalog_timeout_job=None;self._catalog_retry=0;self._hw_refresh_job=None;self._hw_name_job=None;self._hw_seq_job=None;self._hw_seq_timeout_job=None;self._hw_seq_slot=None;self._hw_seq_pages={};self._hw_seq_expected_page=None;self._last_state_dump=None;self.sequence_origin='HARDWARE_STATE_ONLY';self.live_delay=int(self.settings.get('live_delay',0));self.live_playing=False;self.live_countdown_remaining=0;self._live_countdown_job=None
+   self.values={}
+   self.env_gate=False;self.env_release=False;self.env_phase_start=0.0;self.env_level_at_release=0.0;self.env_release_levels={'FENV':0.0,'AENV':0.0};self.anim_values={};self.filter_link=64;self._numeric_entry=None;self._anim_last=time.monotonic();self._anim_job=None;self._env_hover=None
+   self._defaults();self.midi=MidiEngine(self._midi_rx);self._midi_inputs=[];self._midi_outputs=[];self._midi_apply_busy=False;self._midi_apply_result=queue.Queue();self._midi_ports_busy=False;self._midi_ports_result=queue.Queue();self._midi_close_result=queue.Queue();self._midi_close_deadline=0.0;self._cc_last_sent={};self._cc_pending={};self._cc_jobs={};self._cc_interval=0.008;self._midi_rx_queue=queue.Queue();self._midi_rx_job=None;self._popup_clear_job=None
+@@ -177,13 +178,61 @@
+  def _schedule_hardware_refresh(self,n=None):
+   if n is not None:
+    n=max(1,min(256,int(n)));self.preset.number=n;self.hardware_selected=n;self.preset_source='HARDWARE'
+-  for attr in ('_hw_refresh_job','_hw_name_job'):
++  self._cancel_hardware_sequence_read()
++  for attr in ('_hw_refresh_job','_hw_name_job','_hw_seq_job'):
+    job=getattr(self,attr,None)
+    if job is not None:
+     try:self.after_cancel(job)
+     except Exception:pass
++    setattr(self,attr,None)
+   self._hw_refresh_job=self.after(8,self._request_current_state)
++  self._hw_seq_job=self.after(40,lambda slot=self.hardware_selected:self._start_hardware_sequence_read(slot))
+   self._hw_name_job=self.after(500,self._request_current_name)
++ def _cancel_hardware_sequence_read(self):
++  job=getattr(self,'_hw_seq_timeout_job',None)
++  if job is not None:
++   try:self.after_cancel(job)
++   except Exception:pass
++  self._hw_seq_timeout_job=None;self._hw_seq_slot=None;self._hw_seq_pages={};self._hw_seq_expected_page=None
++ def _start_hardware_sequence_read(self,slot):
++  self._hw_seq_job=None
++  if self._closing or self.preset_source!='HARDWARE':return
++  slot=max(1,min(256,int(slot)))
++  if slot!=self.hardware_selected:return
++  self._cancel_hardware_sequence_read();self._hw_seq_slot=slot;self._request_hardware_sequence_page(0)
++ def _request_hardware_sequence_page(self,page):
++  if self._closing or self._hw_seq_slot!=self.hardware_selected:return
++  page=int(page)
++  if not 0<=page<=4:return
++  self._hw_seq_expected_page=page
++  if not self.midi.read_preset_page(page):
++   self._cancel_hardware_sequence_read();return
++  self._hw_seq_timeout_job=self.after(500,self._hardware_sequence_timeout)
++ def _hardware_sequence_timeout(self):
++  self._hw_seq_timeout_job=None;self._hw_seq_slot=None;self._hw_seq_pages={};self._hw_seq_expected_page=None
++  if self.preset_source=='HARDWARE':self.status=f'HARDWARE {self.hardware_selected:03d} — sequence read timeout';self.redraw()
++ def _accept_hardware_sequence_page(self,data):
++  parsed=parse_0x29_response(data)
++  if parsed is None:return False
++  page,payload=parsed
++  if self._hw_seq_slot is None or self._hw_seq_slot!=self.hardware_selected:return True
++  if page!=self._hw_seq_expected_page:return True
++  if self._hw_seq_timeout_job is not None:
++   try:self.after_cancel(self._hw_seq_timeout_job)
++   except Exception:pass
++   self._hw_seq_timeout_job=None
++  self._hw_seq_pages[page]=bytes(payload)
++  if page<4:
++   self._request_hardware_sequence_page(page+1);return True
++  try:
++   apply_to_sequence(self.preset.sequence,{p:self._hw_seq_pages[p] for p in range(1,5)})
++   self.sequence_origin='HARDWARE_0x29'
++   self.status=f'HARDWARE {self.hardware_selected:03d} — 64-step sequence read'
++  except Exception:
++   logger.exception('Failed to decode hardware 0x29 sequence pages');self._set_hardware_sequence_unavailable(reset=False);self.status='HARDWARE sequence decode failed'
++  finally:
++   self._hw_seq_slot=None;self._hw_seq_pages={};self._hw_seq_expected_page=None
++  self.redraw();return True
+  def _request_current_state(self):
+   self._hw_refresh_job=None
+   if not self._closing:self.midi.read_state()
+@@ -798,6 +847,7 @@
+   if self.sequence_origin=='LOCAL_JSON':return 'SEQUENCE SOURCE: LOCAL EDITOR PRESET'
+   if self.sequence_origin=='LOCAL_STATE_ONLY':return 'SEQUENCE SOURCE: LOCAL .unosyp — SEQUENCE FORMAT NOT DECODED'
+   if self.sequence_origin=='SOFTWARE':return 'SEQUENCE SOURCE: SOFTWARE EDITOR'
++  if self.sequence_origin=='HARDWARE_0x29':return 'SEQUENCE SOURCE: HARDWARE 0x29 — 64-STEP DATA DECODED'
+   return 'SEQUENCE SOURCE: HARDWARE 0x37 — 64 STEPS NOT READ'
+  def _local_folder_presets(self,folder):
+   try:
+@@ -2535,6 +2585,8 @@
+     if addr==(0,2) and len(payload)==3:
+      mask=(payload[0]&0x7F)|((payload[1]&0x7F)<<7)|((payload[2]&0x03)<<14)
+      self.arp_trig=[bool(mask & (1<<i)) for i in range(16)];self.status='RX ARP Pattern';self.redraw();return
++   if data[:6]==IK_HEADER and len(data)>=12 and data[7]==0x29:
++    if self._accept_hardware_sequence_page(data):return
+    if data[:6]==IK_HEADER and len(data)>=12 and data[6]==0x32:
+     self._schedule_hardware_refresh(self.hardware_selected);self.redraw();return
+    if len(data)>=43 and data[:6]==IK_HEADER and data[7]==0x24:
+@@ -2557,7 +2609,7 @@
+    if len(data)==309 and data[:6]==IK_HEADER and data[7]==0x37:
+     try:
+      self._last_state_dump=bytes(data)
+-     if self.preset_source=='HARDWARE':self._set_hardware_sequence_unavailable(reset=False)
++     if self.preset_source=='HARDWARE' and self.sequence_origin!='HARDWARE_0x29':self._set_hardware_sequence_unavailable(reset=False)
+      resolved,unresolved=decode_state_0x37(data);applied=0;semantic_skips=0
+      # Apply enums/types first so context-sensitive visible controls (CHORUS MODE,
+      # DELAY/REVERB layouts) see the preset's type before subordinate fields.
+@@ -2571,7 +2623,7 @@
+      # Preserve the previously confirmed sequencer Direction field.
+      off=SEQ_STATE['direction_offset'];raw=data[off]&SEQ_STATE['direction_mask'];name=SEQ_STATE['direction_values'].get(raw)
+      if name:self.choice['SEQ_DIR']=SEQ_DIRECTIONS.index(name)
+-     self.status=f'0x37 state: {applied} GUI fields applied / hardware sequence not read'
++     self.status=f'0x37 state: {applied} GUI fields applied' + (' / hardware sequence read via 0x29' if self.sequence_origin=='HARDWARE_0x29' else ' / hardware sequence pending')
+      if unresolved or semantic_skips:self.status+=f' / {len(unresolved)} unseen / {semantic_skips} unlabeled'
+     except Exception:
+      logger.exception('Failed to decode 0x37 state');self.status=f'0x37 state received ({len(data)} bytes) — decode failed'
+diff -ruN /mnt/data/uno_v161_original/UNO_Pro_Advanced_v1.61/hardware_seq_0x29.py /mnt/data/uno_v161_src/UNO_Pro_Advanced_v1.61/hardware_seq_0x29.py
+--- /mnt/data/uno_v161_original/UNO_Pro_Advanced_v1.61/hardware_seq_0x29.py	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/uno_v161_src/UNO_Pro_Advanced_v1.61/hardware_seq_0x29.py	2026-09-11 22:46:24.922670775 +0000
+@@ -0,0 +1,76 @@
++"""Read-only decoder for UNO Synth Pro hardware preset SysEx 0x29 sequence pages.
++
++Confirmed from official Editor capture + DFU comparison:
++- page 0 payload = 293 bytes (main preset payload; not decoded here)
++- pages 1..4 payload = 192 bytes each
++- first 182 bytes are 7-bit packed sequence data
++- last 10 bytes are page metadata
++- packed data recovers raw page bytes 1..159 exactly
++- raw page byte 0 (control for Steps 1/17/33/49) is not reconstructed and stays None
++
++No write/store operation is implemented here.
++"""
++from typing import Dict,List,Optional,Any
++
++RESPONSE_PREFIX=bytes([0xF0,0x00,0x21,0x1A,0x02,0x03,0x00,0x29,0x00,0x00])
++PAGE_PAYLOAD_SIZE=192
++PACKED_SIZE=182
++STEP_SIZE=10
++STEPS_PER_PAGE=16
++
++def parse_0x29_response(data:bytes):
++    data=bytes(data)
++    if len(data)<12 or not data.startswith(RESPONSE_PREFIX) or data[-1]!=0xF7:return None
++    page=data[10]&0x7F;payload=data[11:-1]
++    expected=293 if page==0 else PAGE_PAYLOAD_SIZE if 1<=page<=4 else None
++    if expected is None or len(payload)!=expected:return None
++    return page,payload
++
++def _unpack_tail(payload:bytes)->bytes:
++    if len(payload)!=PAGE_PAYLOAD_SIZE:raise ValueError(f'0x29 sequence page must be 192 bytes, got {len(payload)}')
++    bits=[]
++    for b in payload[:PACKED_SIZE]:
++        v=b&0x7F
++        bits.extend((v>>i)&1 for i in range(7))
++    bits=bits[:159*8]
++    out=bytearray()
++    for pos in range(0,len(bits),8):
++        v=0
++        for i,bit in enumerate(bits[pos:pos+8]):v|=(bit&1)<<i
++        out.append(v)
++    return bytes(out)
++
++def decode_pages(pages:Dict[int,bytes])->Dict[str,Any]:
++    missing=[p for p in range(1,5) if p not in pages]
++    if missing:raise ValueError(f'missing 0x29 sequence pages: {missing}')
++    steps=[];metadata=[]
++    for page in range(1,5):
++        payload=bytes(pages[page])
++        if len(payload)!=PAGE_PAYLOAD_SIZE:raise ValueError(f'page {page}: expected 192 bytes, got {len(payload)}')
++        logical:[Optional[int]]=[None]+list(_unpack_tail(payload))
++        metadata.append(payload[PACKED_SIZE:].hex(' '))
++        for local in range(STEPS_PER_PAGE):
++            rec=logical[local*STEP_SIZE:(local+1)*STEP_SIZE]
++            notes=[];vels=[];extras=[]
++            for voice in range(3):
++                base=1+voice*3;note=rec[base];vel=rec[base+1];extra=rec[base+2]
++                if note is None or vel is None or extra is None:raise ValueError('unexpected incomplete note tuple')
++                if note!=0xFF and 0<=note<=127:
++                    notes.append(note);vels.append(vel&0x7F);extras.append(extra&0xFF)
++            steps.append({'step':(page-1)*16+local+1,'control_raw':rec[0],
++                          'notes':notes,'note_velocities':vels,'note_extras':extras})
++    return {'steps':steps,'metadata':metadata,'unknown_control_steps':[1,17,33,49]}
++
++def apply_to_sequence(sequence,pages:Dict[int,bytes]):
++    info=decode_pages(pages);active_last=0
++    for item in info['steps']:
++        idx=item['step']-1;st=sequence.steps[idx]
++        st.notes=list(item['notes']);st.note_velocities=list(item['note_velocities']);st.note_extras=list(item['note_extras'])
++        st.control_raw=item['control_raw']
++        if st.note_velocities:st.velocity=st.note_velocities[0]
++        if st.notes:active_last=idx+1
++    sequence.length=max(16,active_last)
++    sequence.length_confirmed=False
++    sequence.binary_page_headers=[]
++    sequence.binary_page_metadata=list(info['metadata'])
++    return info
+diff -ruN /mnt/data/uno_v161_original/UNO_Pro_Advanced_v1.61/midi_engine.py /mnt/data/uno_v161_src/UNO_Pro_Advanced_v1.61/midi_engine.py
+--- /mnt/data/uno_v161_original/UNO_Pro_Advanced_v1.61/midi_engine.py	2026-09-09 14:38:42.000000000 +0000
++++ /mnt/data/uno_v161_src/UNO_Pro_Advanced_v1.61/midi_engine.py	2026-09-11 22:46:24.922869044 +0000
+@@ -1,5 +1,5 @@
+ import sys,logging
+-from protocol_map import STATE_READ,preset_name_read
++from protocol_map import STATE_READ,preset_name_read,preset_page_read
+ logger=logging.getLogger(__name__)
+ class MidiEngine:
+  def __init__(self,on_message=None):
+@@ -44,6 +44,7 @@
+   except Exception:logger.exception('Failed to send SysEx');return False
+  def read_state(self):return self.sysex(STATE_READ)
+  def read_preset_name(self,n):return self.sysex(preset_name_read(n))
++ def read_preset_page(self,page):return self.sysex(preset_page_read(page))
+  def start(self):return self._short(0xFA)
+  def stop(self):return self._short(0xFC)
+  def close(self):
+diff -ruN /mnt/data/uno_v161_original/UNO_Pro_Advanced_v1.61/protocol_map.py /mnt/data/uno_v161_src/UNO_Pro_Advanced_v1.61/protocol_map.py
+--- /mnt/data/uno_v161_original/UNO_Pro_Advanced_v1.61/protocol_map.py	2026-09-10 20:31:08.000000000 +0000
++++ /mnt/data/uno_v161_src/UNO_Pro_Advanced_v1.61/protocol_map.py	2026-09-11 22:46:24.922766670 +0000
+@@ -5,10 +5,14 @@
+ IK_HEADER = bytes([0xF0,0x00,0x21,0x1A,0x02,0x03])
+ STATE_READ = bytes([0xF0,0x00,0x21,0x1A,0x02,0x03,0x37,0x00,0x00,0xF7])
+ PRESET_NAME_READ_PREFIX = bytes([0xF0,0x00,0x21,0x1A,0x02,0x03,0x24,0x01])
++PRESET_PAGE_READ_PREFIX = bytes([0xF0,0x00,0x21,0x1A,0x02,0x03,0x29,0x00,0x00])
+ def preset_name_read(slot):
+     n=max(1,min(256,int(slot)))-1
+     return PRESET_NAME_READ_PREFIX+bytes([n//128,n%128,0xF7])
+-COMMANDS={0x24:'preset name/info',0x28:'bulk preset-state write/store (LOCKED)',0x32:'current preset notification',0x33:'preset select/load (partial)',0x36:'current-buffer load (EXPERIMENTAL / not hardware-confirmed)',0x37:'current state read'}
++def preset_page_read(page):
++    page=max(0,min(4,int(page)))
++    return PRESET_PAGE_READ_PREFIX+bytes([page,0xF7])
++COMMANDS={0x24:'preset name/info',0x28:'bulk preset-state write/store (LOCKED)',0x29:'hardware preset/page read',0x32:'current preset notification',0x33:'preset select/load (partial)',0x36:'current-buffer load (EXPERIMENTAL / not hardware-confirmed)',0x37:'current state read'}
+ CC={
+  'BANK':0,'MOD_WHEEL':1,'GLIDE':5,'VCA':7,'SWING':9,
+  'OSC1_WAVE':12,'OSC2_WAVE':13,'OSC3_WAVE':14,

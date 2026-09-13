@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+*.tmp
+*.log
+Docs/test[2-5].unosyp
+.snapshot_chunks/
+SYNC_NOTE.txt

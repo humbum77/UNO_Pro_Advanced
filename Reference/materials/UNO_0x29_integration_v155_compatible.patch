@@ -1,0 +1,94 @@
+# UNO Pro Advanced — SysEx 0x29 hardware sequence read integration
+# Target: v1.55-style architecture. Read-only; STORE/0x28 untouched.
+
+--- a/protocol_map.py
++++ b/protocol_map.py
+@@
+ PRESET_NAME_READ_PREFIX = bytes([0xF0,0x00,0x21,0x1A,0x02,0x03,0x24,0x01])
++PRESET_PAGE_READ_PREFIX = bytes([0xF0,0x00,0x21,0x1A,0x02,0x03,0x29,0x00,0x00])
+@@
+ def preset_name_read(slot):
+     n=max(1,min(256,int(slot)))-1
+     return PRESET_NAME_READ_PREFIX+bytes([n//128,n%128,0xF7])
++def preset_page_read(page):
++    page=max(0,min(4,int(page)))
++    return PRESET_PAGE_READ_PREFIX+bytes([page,0xF7])
+@@
+-COMMANDS={0x24:'preset name/info',0x28:'bulk preset write (LOCKED)',0x32:'current preset notification',0x33:'preset select/load (partial)',0x37:'current state read'}
++COMMANDS={0x24:'preset name/info',0x28:'bulk preset write (LOCKED)',0x29:'hardware preset/page read',0x32:'current preset notification',0x33:'preset select/load (partial)',0x37:'current state read'}
+
+--- a/midi_engine.py
++++ b/midi_engine.py
+@@
+-from protocol_map import STATE_READ,preset_name_read
++from protocol_map import STATE_READ,preset_name_read,preset_page_read
+@@
+  def read_state(self):return self.sysex(STATE_READ)
+  def read_preset_name(self,n):return self.sysex(preset_name_read(n))
++ def read_preset_page(self,page):return self.sysex(preset_page_read(page))
+
+--- a/app.py
++++ b/app.py
+@@
+ from state_decoder import decode_state_0x37
++from hardware_seq_0x29 import parse_0x29_response,apply_to_sequence
+@@
++ # __init__: add transaction state
++ self._hw_seq_slot=None
++ self._hw_seq_pages={}
++ self._hw_seq_expected_page=None
++ self._hw_seq_timeout_job=None
++
++ def _cancel_hardware_sequence_read(self):
++  job=getattr(self,'_hw_seq_timeout_job',None)
++  if job is not None:
++   try:self.after_cancel(job)
++   except Exception:pass
++  self._hw_seq_timeout_job=None;self._hw_seq_slot=None;self._hw_seq_pages={};self._hw_seq_expected_page=None
++
++ def _start_hardware_sequence_read(self,slot):
++  if self._closing or self.preset_source!='HARDWARE':return
++  slot=max(1,min(256,int(slot)))
++  if slot!=self.hardware_selected:return
++  self._cancel_hardware_sequence_read();self._hw_seq_slot=slot;self._request_hardware_sequence_page(0)
++
++ def _request_hardware_sequence_page(self,page):
++  if self._closing or self._hw_seq_slot!=self.hardware_selected:return
++  self._hw_seq_expected_page=int(page)
++  if not self.midi.read_preset_page(page):
++   self._cancel_hardware_sequence_read();return
++  self._hw_seq_timeout_job=self.after(350,self._hardware_sequence_timeout)
++
++ def _hardware_sequence_timeout(self):
++  self._hw_seq_timeout_job=None;self._hw_seq_slot=None;self._hw_seq_pages={};self._hw_seq_expected_page=None
++  self.status='HARDWARE SEQUENCE READ TIMEOUT';self.redraw()
++
++ def _accept_hardware_sequence_page(self,data):
++  parsed=parse_0x29_response(data)
++  if parsed is None:return False
++  page,payload=parsed
++  if self._hw_seq_slot is None or self._hw_seq_slot!=self.hardware_selected:return True
++  if page!=self._hw_seq_expected_page:return True
++  if self._hw_seq_timeout_job is not None:
++   try:self.after_cancel(self._hw_seq_timeout_job)
++   except Exception:pass
++   self._hw_seq_timeout_job=None
++  self._hw_seq_pages[page]=bytes(payload)
++  if page<4:self._request_hardware_sequence_page(page+1);return True
++  try:
++   apply_to_sequence(self.preset.sequence,{p:self._hw_seq_pages[p] for p in range(1,5)})
++   if hasattr(self,'sequence_origin'):self.sequence_origin='HARDWARE_0x29'
++   self.status=f'HARDWARE {self.hardware_selected:03d} — 64 SEQUENCE STEPS READ'
++  except Exception:
++   logger.exception('Failed to decode hardware 0x29 sequence pages');self.status='HARDWARE SEQUENCE DECODE FAILED'
++  finally:
++   self._hw_seq_slot=None;self._hw_seq_pages={};self._hw_seq_expected_page=None
++  self.redraw();return True
++
++ # In _schedule_hardware_refresh(), cancel old transaction and start after normal state request:
++ self._cancel_hardware_sequence_read()
++ self.after(40,lambda slot=self.hardware_selected:self._start_hardware_sequence_read(slot))
++
++ # At the top of the is_sysex branch in _midi_rx_ui():
++ if data[:6]==IK_HEADER and len(data)>=12 and data[7]==0x29:
++  if self._accept_hardware_sequence_page(data):return
