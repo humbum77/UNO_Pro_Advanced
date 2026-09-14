@@ -1,5 +1,5 @@
 """Independent ripple model. All step numbers are computed, one-based."""
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, replace, field
 from uuid import uuid4
 
 @dataclass(frozen=True)
@@ -7,6 +7,8 @@ class PresetBlock:
     id: str
     preset: str | None
     length: int = 1
+    color: str | None = None
+    parameters: dict = field(default_factory=dict)
 
 @dataclass(frozen=True)
 class SongStep:
@@ -24,6 +26,17 @@ class Arrangement:
         self.loop_range = None
         self.playing = False
         self.tempo = 120
+        self.markers = {}
+    def set_marker(self,step,text):
+        if step not in [s for b,s,e in self.ranges()]:raise ValueError('Marker must start at a block boundary')
+        text=text.strip()[:80]
+        if text:self.markers[step]=text
+        else:self.markers.pop(step,None)
+    def sections(self):
+        positions=sorted(self.markers)
+        return [(s,positions[i+1]-1 if i+1<len(positions) else self.length,self.markers[s]) for i,s in enumerate(positions)]
+    def set_color(self,ids,color):
+        self.blocks=tuple(replace(b,color=color) if b.id in ids else b for b in self.blocks)
     def set_tempo(self, value):
         value=int(value)
         if not 20<=value<=300:raise ValueError('Tempo must be 20–300 BPM')
@@ -72,12 +85,25 @@ class Arrangement:
             else:self.selection.add(id)
         else:self.selection={id}
     def commit(self, blocks):
+        blocks=tuple(blocks)
         if any(type(b.length) is not int or b.length < 1 for b in blocks):
             raise ValueError('Length must be a positive integer')
         if sum(b.length for b in blocks)>64: raise ValueError('64-step limit reached')
         old=next(((b.id,self.selected_step-s) for b,s,e in self.ranges()
                   if self.selected_step is not None and s<=self.selected_step<=e),None)
-        self.blocks=tuple(blocks)
+        old_ranges=list(self.ranges());new_starts={};position=1
+        for b in blocks:new_starts[b.id]=position;position+=b.length
+        markers={}
+        for step,text in sorted(self.markers.items()):
+            following=[b.id for b,s,e in old_ranges if s>=step and b.id in new_starts]
+            if following:
+                position=new_starts[following[0]]
+                previous=markers.get(position)
+                if previous is not None and previous!=text:
+                    raise ValueError(f'Marker conflict at {position:02d}: operation cancelled; resolve markers first')
+                markers[position]=text
+        self.markers=markers
+        self.blocks=blocks
         self.selection.intersection_update(b.id for b in blocks)
         self.loop_range=None
         self.playing=False
@@ -101,6 +127,20 @@ class Arrangement:
         items.insert(index,PresetBlock(uuid4().hex,preset,1));self.commit(items)
     def resize(self,id,length):
         items=list(self.blocks); i=self.index(id); items[i]=replace(items[i],length=length); self.commit(items)
+    def resize_left(self,id,delta):
+        if type(delta)is not int:raise ValueError('Whole steps required')
+        if not delta:return
+        items=list(self.blocks);i=self.index(id);block=items[i]
+        if block.length-delta<1:raise ValueError('Length must be a positive integer')
+        gap=i>0 and items[i-1].preset is None
+        if delta<0 and (not gap or items[i-1].length < -delta):raise ValueError('Cannot cross preceding block')
+        items[i]=replace(block,length=block.length-delta)
+        if gap:
+            size=items[i-1].length+delta
+            if size:items[i-1]=replace(items[i-1],length=size)
+            else:items.pop(i-1)
+        elif delta>0:items.insert(i,PresetBlock(uuid4().hex,None,delta))
+        self.commit(items)
     def move(self,id,delta):
         if type(delta) is not int: raise ValueError('Whole steps required')
         if not delta: return

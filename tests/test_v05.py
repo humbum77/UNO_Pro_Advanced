@@ -25,19 +25,18 @@ class NextIterationTests(unittest.TestCase):
         before=a.blocks
         with self.assertRaises(ValueError):a.insert_at_slot(2,'B',65)
         self.assertEqual(a.blocks,before)
-    def test_one_step_holds_until_stop(self):
-        s=Session();s.song.timeline.insert(0,'A');s.toggle(0)
-        for now in (.01,.5,1,100):s.update(now);self.assertTrue(s.active)
-        s.select_pad(1);self.assertEqual(s.playing_pad,0);s.toggle(101);self.assertFalse(s.active)
+    def test_one_step_uses_sequence_duration(self):
+        s=Session(resolver=lambda ref:16);s.song.timeline.insert(0,'A');s.toggle(0)
+        for now in (.01,.5,1,7.9):s.update(now);self.assertTrue(s.active)
+        s.select_pad(1);self.assertEqual(s.playing_pad,0);s.update(8);self.assertFalse(s.active)
     def test_pulse_soft(self):
         self.assertNotEqual(pulse('#496879',0),pulse('#496879',.75))
         for now in (0,.75,1.5,2.25):
             p=pulse('#496879',now)
             for i in (1,3,5):self.assertGreater(int(p[i:i+2],16),int('#496879'[i:i+2],16))
-    def test_enable_loop_after_hold(self):
-        s=Session();a=s.song.timeline;a.insert(0,'A',3);s.toggle(0);s.update(2)
-        self.assertIsNone(s.next_tick)
-        a.select(1);a.toggle_loop();s.update(3)
-        self.assertEqual(a.playhead,1);self.assertIsNotNone(s.next_tick)
+    def test_unknown_duration_does_not_start(self):
+        s=Session();s.song.timeline.insert(0,'A',3)
+        with self.assertRaisesRegex(ValueError,'duration unknown'):s.toggle(0)
+        self.assertFalse(s.active)
 
 if __name__=='__main__':unittest.main()

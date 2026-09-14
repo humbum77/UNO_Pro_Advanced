@@ -5,14 +5,14 @@ from .session import Session
 from .arrangement import PresetBlock
 
 def encode(session):
-    return {'format':'LiveCreatorState','version':1,'selected':session.selected,
+    return {'format':'LiveCreatorState','version':2,'selected':session.selected,
             'global_settings':session.global_settings,'controller_settings':session.controller_settings,
             'pads':[{'name':s.name,'color':s.color,'tempo':s.timeline.tempo,'delay':s.delay,
-                     'colors':s.colors,'loop':s.timeline.loop_range,
-                     'blocks':[{'id':b.id,'preset':b.preset,'length':b.length} for b in s.timeline.blocks]} for s in session.pads]}
+                     'colors':s.colors,'loop':s.timeline.loop_range,'markers':s.timeline.markers,
+                     'blocks':[{'id':b.id,'preset':b.preset,'length':b.length,'color':b.color,'parameters':b.parameters} for b in s.timeline.blocks]} for s in session.pads]}
 
 def decode(data):
-    if data.get('format')!='LiveCreatorState' or data.get('version')!=1 or len(data['pads'])!=64:raise ValueError('Invalid Live Creator state')
+    if data.get('format')!='LiveCreatorState' or data.get('version') not in (1,2) or len(data['pads'])!=64:raise ValueError('Invalid Live Creator state')
     session=Session();session.select_pad(data.get('selected',0))
     session.global_settings=data.get('global_settings',{});session.controller_settings=data.get('controller_settings',{})
     if not isinstance(session.global_settings,dict) or not isinstance(session.controller_settings,dict):raise ValueError('Invalid settings')
@@ -28,9 +28,11 @@ def decode(data):
         blocks=[]
         for b in d['blocks']:
             if not isinstance(b['id'],str) or b['preset'] is not None and not isinstance(b['preset'],str):raise ValueError('Invalid block')
-            blocks.append(PresetBlock(b['id'],b['preset'],b['length']))
+            if not isinstance(b.get('parameters',{}),dict):raise ValueError('Invalid block parameters')
+            blocks.append(PresetBlock(b['id'],b['preset'],b['length'],color(b['color']) if b.get('color') else None,b.get('parameters',{})))
         if len({b.id for b in blocks})!=len(blocks):raise ValueError('Duplicate block ID')
         song.timeline.commit(blocks)
+        for step,label in d.get('markers',{}).items():song.timeline.set_marker(int(step),label)
         loop=d.get('loop')
         if loop is not None:
             if len(loop)!=2 or not all(type(x)is int for x in loop) or not 1<=loop[0]<=loop[1]<=song.timeline.length:raise ValueError('Invalid loop')
@@ -40,6 +42,7 @@ def decode(data):
 def load(path):return decode(json.loads(Path(path).read_text(encoding='utf-8')))
 def save(path,session):
     path=Path(path);payload=json.dumps(encode(session),ensure_ascii=False,indent=2)
+    path.parent.mkdir(parents=True,exist_ok=True)
     fd,tmp=tempfile.mkstemp(dir=path.parent,suffix='.tmp')
     try:
         with os.fdopen(fd,'w',encoding='utf-8') as stream:stream.write(payload)

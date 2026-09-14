@@ -10,3 +10,4 @@ Docs/test[2-5].unosyp
 SYNC_NOTE.txt
 builds/
 LiveCreatorState.json
+tests/review-*/
