@@ -38,11 +38,17 @@ class Session:
     def update(self,now):
         if self.pending_pad is not None and now>=self.deadline:
             self.playing_pad=self.pending_pad;self.pending_pad=None;self.deadline=None
-            a=self.pads[self.playing_pad].timeline;a.playhead=self.start_step;a.playing=True;self.next_tick=now+60/a.tempo
+            a=self.pads[self.playing_pad].timeline
+            if not a.length:self.stop();return
+            a.playhead=min(self.start_step,a.length);a.playing=True;self.next_tick=now+60/a.tempo
         if self.playing_pad is not None:
             a=self.pads[self.playing_pad].timeline
             if not a.playing:self.stop();return
+            if self.next_tick is None and a.loop_range:self.next_tick=now
             while self.next_tick is not None and now>=self.next_tick:
                 a.advance()
-                if not a.playing:self.stop();break
+                if not a.playing:
+                    # Visual audition stays engaged at the final block until STOP.
+                    # No verified sequence duration exists; a beat is not a song step.
+                    a.playing=True;self.next_tick=None;break
                 self.next_tick+=60/a.tempo

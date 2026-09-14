@@ -25,7 +25,9 @@ class SessionTests(unittest.TestCase):
         s=self.make();a=s.song.timeline;a.select(1);a.select(4,True);a.toggle_loop();s.toggle(0)
         a.select(3);s.select_pad(8);s.update(1.0);self.assertEqual(a.playhead,1);self.assertTrue(s.active)
     def test_end(self):
-        s=self.make();s.toggle(0);s.update(3);self.assertFalse(s.active)
+        s=self.make();s.toggle(0);s.update(3);self.assertTrue(s.active)
+        self.assertEqual(s.song.timeline.playhead,5);self.assertIsNone(s.next_tick)
+        s.toggle(4);self.assertFalse(s.active)
     def test_deselected_block_starts_at_beginning(self):
         s=self.make();s.song.timeline.select(4);s.song.timeline.select(4,True);s.toggle(0)
         self.assertEqual(s.song.timeline.playhead,1)

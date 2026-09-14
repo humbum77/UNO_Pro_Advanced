@@ -90,6 +90,15 @@ class Arrangement:
         self.commit(items); return b.id
     def replace(self,id,preset):
         items=list(self.blocks); i=self.index(id); items[i]=replace(items[i],preset=preset); self.commit(items)
+    def delete_selected(self):
+        if not self.selection:return
+        self.commit([b for b in self.blocks if b.id not in self.selection])
+        self.selection.clear();self.selected_step=None
+    def insert_at_slot(self,index,preset,slot):
+        items=list(self.blocks)
+        if index==len(items) and slot>self.length+1:
+            items.append(PresetBlock(uuid4().hex,None,slot-self.length-1));index=len(items)
+        items.insert(index,PresetBlock(uuid4().hex,preset,1));self.commit(items)
     def resize(self,id,length):
         items=list(self.blocks); i=self.index(id); items[i]=replace(items[i],length=length); self.commit(items)
     def move(self,id,delta):
