@@ -66,7 +66,9 @@ class Arrangement:
         self.selected_step = n
         id=self.steps()[n-1].block_id
         if additive:
-            if id in self.selection:self.selection.remove(id)
+            if id in self.selection:
+                self.selection.remove(id)
+                self.selected_step=next((s for b,s,e in self.ranges() if b.id in self.selection),None)
             else:self.selection.add(id)
         else:self.selection={id}
     def commit(self, blocks):

@@ -1,7 +1,6 @@
 """Read-only discovery adapted from the inherited UNO storage.py."""
 from pathlib import Path
 import sys
-import hashlib
 
 def default_root():
     documents=Path.home()/'Documents'
@@ -19,7 +18,11 @@ def children(folder):
     except OSError:return []
 
 class PresetLibrary:
-    def __init__(self):self.assets={};self.names={}
+    def __init__(self):self.names={}
     def capture(self,path):
-        path=Path(path);raw=path.read_bytes();id=hashlib.sha256(raw).hexdigest()
-        self.assets[id]=raw;self.names.setdefault(id,path.stem);return id
+        path=Path(path).resolve()
+        if not path.is_file():raise ValueError('PRESET NOT FOUND')
+        self.names[str(path)]=path.stem
+        return str(path)
+    def label(self,id):
+        return Path(id).stem if Path(id).is_file() else 'PRESET NOT FOUND'

@@ -5,12 +5,13 @@ from live_creator.devices.uno.library import PresetLibrary,children
 from live_creator.core.arrangement import Arrangement
 
 class V02Tests(unittest.TestCase):
-    def test_raw_preservation(self):
+    def test_reference_only(self):
         with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as folder:
             p=Path(folder)/'Bass.unosyp';raw=bytes(range(256))*5;p.write_bytes(raw)
             lib=PresetLibrary();id=lib.capture(p);p.unlink()
-            self.assertEqual(lib.assets[id],raw)
-            p.write_bytes(raw);self.assertEqual(lib.capture(p),id);self.assertEqual(len(lib.assets),1)
+            self.assertEqual(lib.label(id),'PRESET NOT FOUND')
+            self.assertFalse(hasattr(lib,'assets'))
+            p.write_bytes(raw);self.assertEqual(lib.capture(p),id)
     def test_browser(self):
         with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as folder:
             root=Path(folder);(root/'songs').mkdir();(root/'Bass').mkdir();(root/'z.unosyp').touch();(root/'x.txt').touch()
