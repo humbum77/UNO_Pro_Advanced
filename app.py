@@ -30,7 +30,7 @@ def clamp(v,a,b):return max(a,min(b,v))
 
 class App(tk.Tk):
  def __init__(self):
-  super().__init__(); self.title('UNO Pro Advanced v0.10.0-alpha'); self.configure(bg=BG)
+  super().__init__(); self.title('UNO Pro Advanced v0.9.6-beta'); self.configure(bg=BG)
   sw,sh=self.winfo_screenwidth(),self.winfo_screenheight(); w,h=1440,900; self.geometry(f'{w}x{h}+{max(0,(sw-w)//2)}+{max(0,(sh-h)//2)}'); self.resizable(False,False)
   self.canvas=tk.Canvas(self,bg=BG,highlightthickness=0);self.canvas.pack(fill='both',expand=True)
   self.settings=storage.load_settings();self.settings.setdefault('ui_scale','100%');self.settings.setdefault('pitch_bend_range',2);self.settings['midi_clock']='MIDI MASTER' if self.settings.get('midi_clock')=='MIDI' else ('Off' if self.settings.get('midi_clock') not in ('Off','MIDI MASTER') else self.settings.get('midi_clock'));self.settings_dirty=False;self._applied_settings=copy.deepcopy(self.settings);self.keyboard_visible=bool(self.settings.get('keyboard_visible',False));self.keyboard_octave_shift=0;self._clock_master_job=None;self.page='SYNTH';self._apply_ui_scale(self.settings.get('ui_scale','100%'),save=False)

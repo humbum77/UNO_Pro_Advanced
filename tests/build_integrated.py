@@ -10,8 +10,9 @@ def main():
  release=ROOT/'builds'/name
  archive=ROOT/'builds'/(name+'.zip')
  if release.exists() or archive.exists():raise RuntimeError('Historical build already exists')
- files=list(ROOT.glob('*.py'))+[ROOT/n for n in ('VERSION','AGENTS.md','README.md','README.ru.md','CHANGELOG.md','PROJECT_INDEX.md','run_editor.bat','install_dependencies.bat','state_decoder_map.json','Docs/requirements.txt','Docs/INTEGRATION_v0.10.0-alpha.md')]
+ files=list(ROOT.glob('*.py'))+[ROOT/n for n in ('VERSION','AGENTS.md','README.md','README.ru.md','CHANGELOG.md','PROJECT_INDEX.md','run_editor.bat','install_dependencies.bat','state_decoder_map.json','Docs/requirements.txt','Docs/INTEGRATION_v0.9.6-beta.md')]
  files+=list((ROOT/'live_creator').rglob('*.py'))
+ files+=[ROOT/'Docs'/n for n in ('PROJECT_STATE.md','DECISIONS.md','RELEASE_PREPARATION.md')]
  files+=[p for p in (ROOT/'Assets').rglob('*') if p.is_file()]
  files+=[p for p in (ROOT/'tests').glob('*.py') if p.name!='build_live_creator.py']
  for p in files:

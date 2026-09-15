@@ -1,6 +1,8 @@
 # Changelog
 
-## 0.10.0-alpha — 2026-09-15
+## 0.9.6-beta — 2026-09-15
+
+Corrected the unapproved local designation `0.10.0-alpha` to `0.9.6-beta`, continuing the main beta line. No functional changes in this version correction. The earlier local archive is superseded and is not the release to publish; Git history is preserved.
 
 - Integrated live-creator e2b0a97 into main 51906bc; embedded LIVE page replaces legacy SONG/LIVE switch.
 - Song LENGTH 1–64 clips playback/nominal timing and statistics without deleting timeline data; 4px rounded blocks.

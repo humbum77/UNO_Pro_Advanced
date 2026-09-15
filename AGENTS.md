@@ -1,5 +1,9 @@
 # UNO Pro Advanced — integration rules (2026-09-15)
 
+Текущая версия основной линии: **v0.9.6-beta**, после v0.9.5-beta. Alpha-статус standalone Live Creator не переносится на основную программу. Прежнее обозначение v0.10.0-alpha было ошибочным локальным названием, не отдельным согласованным релизом. История сохраняется; исправление — отдельным commit.
+Актуальный builder: `tests/build_integrated.py`; отчёт: `Docs/INTEGRATION_v0.9.6-beta.md`. Старые standalone build rules ниже относятся только к истории.
+Общие документы `D:\UNO\docs\PROJECT_STATE.md` и `DECISIONS.md` синхронизируются с `Docs/PROJECT_STATE.md` и `Docs/DECISIONS.md` в репозитории для отправки на GitHub. Не повышать PARTIAL/UNKNOWN или hardware status при исправлении версии.
+
 Текущее ТЗ: `D:\UNO\UNO_LOCAL_INTEGRATION_TZ.md`, APPROVED FOR IMPLEMENTATION.
 Пользователь явно разрешил интеграцию в `D:\UNO\project_unified`, ветка `main`, и финальную сборку после тестов, документации и commit. Это заменяет старые запреты ниже на изменение main.
 Начальный main: `51906bc1a40a636441c98f10794113d696ffc180`; источник Live Creator: `e2b0a977d194fdf28e40eaac73b1eaae8de525b0`.

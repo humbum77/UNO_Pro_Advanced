@@ -1,4 +1,6 @@
-# UNO Pro Advanced v0.10.0-alpha — integration report
+# UNO Pro Advanced v0.9.6-beta — integration report
+
+Release naming correction: the integration was initially committed locally under the unapproved name `0.10.0-alpha` in commit `2a63c2684c89881003bdd015cc24a58dbde11e95`. The user approved continuation as `0.9.6-beta`. That old local archive is superseded; do not publish it. Functional behavior and PARTIAL/UNKNOWN statuses are unchanged by this correction.
 
 Date: 2026-09-15. Branch: main. Worktree: `D:\UNO\project_unified`.
 Starting main: `51906bc1a40a636441c98f10794113d696ffc180`, clean working tree.
@@ -54,6 +56,8 @@ All new service writes use `%LOCALAPPDATA%\UnoLive`. Legacy settings/metadata ma
 
 ## 5. Verification
 
+Version-correction pass: 57 unittest PASS, compile/import PASS, runtime diff is strictly the version string, shared docs mirrors match. GUI checks below passed for the integration before renaming, but could not be repeated for v0.9.6-beta: the former Tcl/Tk test folder is absent and access to installed Python was denied by approval infrastructure. Current beta launch / GUI recheck is therefore UNVERIFIED, not a newly claimed PASS. CRC/manifest checks are performed on the rebuilt beta archive.
+
 - 57 current unittest checks: Live regression plus integration model/storage/safety checks.
 - Real Tk software GUI: all pages in both themes, embedded Live, LENGTH/inactive slots/radius, 64 pads, selection isolation, picker, Dupl, no MIDI sends.
 - Standalone Live GUI regression: menus, palette, clipboard keys, markers, shapes and three window sizes.
@@ -69,7 +73,7 @@ Marker collision rejects edit atomically instead of joining labels. EMPTY musica
 
 ## 7. Build
 
-Version: 0.10.0-alpha. Date: 2026-09-15.
+Version: 0.9.6-beta. Date: 2026-09-15.
 Format: source standalone folder + ZIP, Python 3.12+ / Tkinter / Pillow; not an autonomous EXE.
-Path: `D:\UNO\project_unified\builds\UNO_Pro_Advanced_v0.10.0-alpha.zip`.
-Source commit: see `BUILD_COMMIT` inside release; manifest hashes included. Build is created after commit and rejects overwriting historical releases. Launch verification uses packaged main entry point with mocked MIDI and isolated settings; no hardware pass implied.
+Path: `D:\UNO\project_unified\builds\UNO_Pro_Advanced_v0.9.6-beta.zip`.
+Source commit: see `BUILD_COMMIT` inside release; manifest hashes included. Build is created after commit and rejects overwriting historical releases. The previous integration launch used packaged main with mocked MIDI and isolated settings. Repeating launch on the corrected beta is blocked by unavailable Tcl/Tk/access; manual launch remains to be checked. No hardware pass implied.

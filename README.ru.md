@@ -1,7 +1,7 @@
-# UNO Pro Advanced v0.10.0-alpha
+# UNO Pro Advanced v0.9.6-beta
 
 Интеграция main v0.9.5-beta и Live Creator v0.6-alpha: встроенная страница LIVE, LENGTH, скруглённые блоки, Dupl, parameter Automation, read-only native reader и общие Dark/Light темы.
-Актуальный [отчёт с проверками и ограничениями](Docs/INTEGRATION_v0.10.0-alpha.md), [changelog](CHANGELOG.md).
+Актуальный [отчёт с проверками и ограничениями](Docs/INTEGRATION_v0.9.6-beta.md), [changelog](CHANGELOG.md).
 Служебное хранилище: `%LOCALAPPDATA%\UnoLive`. Пользовательские presets не переносятся.
 Это source standalone для Python/Tkinter/Pillow, не автономный EXE. Native automation writer/mapping остаются PARTIAL; Live playback без MIDI/звука. Hardware PASS не заявляется.
 

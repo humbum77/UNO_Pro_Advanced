@@ -18,3 +18,24 @@
 - При `SYNC = Internal` не отправлять `F8`.
 - Транспорт Start/Stop/Continue сохранять.
 - Генерацию `F8` использовать для `SYNC = USB + MIDI MASTER`.
+
+## 2026-09-15 — интеграция Live Creator
+
+- Пользователь разрешил интеграцию live-creator в main по UNO_LOCAL_INTEGRATION_TZ.md, с тестами, документацией, commit и финальной сборкой.
+- Работа интеграции ведётся в D:\UNO\project_unified; отдельный worktree Live-Creator сохраняется.
+- Выбранная песня и playback snapshot независимы. LENGTH ограничивает воспроизведение без удаления блоков Timeline. Markers принадлежат песне, не block clipboard.
+- Native reader использует подтверждённый контейнер byte494/payload496. Exact two-byte IDs/value/step mapping и writer остаются PARTIAL; byte495/MAX UNKNOWN.
+- Sequence Length читается непосредственно из bytes207–208; один sequencer step = 1/16 ноты, по подтверждению пользователя.
+- Все служебные данные UnoLive сохраняются под %LOCALAPPDATA%\UnoLive. User presets не копируются и не удаляются операциями над песнями/блоками.
+- Темы используют общие semantic tokens. Green PLAY/red REC не участвуют в accent swap. Song Pads остаются dark.
+
+## 2026-09-15 — исправление номера релиза и подготовка GitHub
+
+- Согласованная следующая версия основной программы — **v0.9.6-beta** после v0.9.5-beta.
+- Название v0.10.0-alpha было выбрано без согласования и не является новой утверждённой линией. Alpha standalone Live Creator не переносится на основную программу.
+- Исправляются VERSION, UI title, README, changelog, integration report, builder и общая документация. Функциональные изменения в рамках исправления версии не вносятся.
+- История Git не переписывается: merge 2a63c26 сохраняется, исправление оформляется последующим commit.
+- Старые локальные alpha-артефакты сохраняются, но не публикуются. Для отправки готовится только UNO_Pro_Advanced_v0.9.6-beta.zip.
+- Подготовка не означает разрешение push, создания tag или GitHub Release. Перед отправкой проверить актуальную удалённую main; при расхождении остановиться, не force push.
+- Общие PROJECT_STATE.md и DECISIONS.md синхронизируются между D:\UNO\docs и Docs основного Git-репозитория.
+- Исправление номера не повышает SOFTWARE PASS до HARDWARE PASS и не закрывает PARTIAL/UNKNOWN.

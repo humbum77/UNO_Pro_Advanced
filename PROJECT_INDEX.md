@@ -2,9 +2,9 @@
 
 ## Состав
 
-- Корень: runtime-исходники интеграционной сборки `v0.10.0-alpha` на базе `v0.9.5-beta`.
+- Корень: runtime-исходники интеграционной сборки `v0.9.6-beta` на базе `v0.9.5-beta`.
 - `live_creator/`: встроенный Live Creator, интегрированный из `e2b0a97`.
-- `Docs/INTEGRATION_v0.10.0-alpha.md`: актуальные решения, проверки, PARTIAL/UNKNOWN и сборка.
+- `Docs/INTEGRATION_v0.9.6-beta.md`: актуальные решения, проверки, PARTIAL/UNKNOWN и сборка.
 - `tests/`: актуальные regression/GUI/capture проверки и `build_integrated.py`.
 - `Docs/`: документация, решения, тесты и release notes из актуальной beta-линии.
 - `Reference/materials/`: исследовательские материалы из `D:\UNO\materials`, включая SysEx, карты состояния, декодеры и архивные справочники.
