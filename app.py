@@ -637,7 +637,7 @@ class App(tk.Tk):
  def _env_marker_position(self,key,coords):
   if not (self.env_gate or self.env_release):return None
   now=time.monotonic();t=max(0.0,now-self.env_phase_start)
-  A0=self._env_seconds(self.values.get(key+'_A',0),'A');D0=self._env_seconds(self.values.get(key+'_D',0),'D');R0=self._env_seconds(self.values.get(key+'_R',0),'R');A=0 if A0<=0 else max(A0,.075);D=0 if D0<=0 else max(D0,.075);R=0 if R0<=0 else max(R0,.075)
+  A0=self._env_seconds(self.values.get(key+'_A',0),'A');D0=self._env_seconds(self.values.get(key+'_D',0),'D');R0=self._env_seconds(self.values.get(key+'_R',0),'R');A=0 if A0<=0 else max(A0,.020);D=0 if D0<=0 else max(D0,.020);R=0 if R0<=0 else max(R0,.020)
   S=clamp(float(self.values.get(key+'_S',127))/127.0,0.0,1.0)
   start=(.03,.90);attack=coords[0];decay=coords[1];sustain=coords[2];release=coords[3]
   def lerp(p0,p1,q):
