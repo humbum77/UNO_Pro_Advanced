@@ -194,6 +194,11 @@ def parse_unosyp(data: bytes) -> Dict[str, Any]:
         "sequence_start": SEQ_START,
         "pages": [],
     }
+    from native_automation import read_automation,sequence_length
+    try:result['native_automation']=read_automation(data)
+    except ValueError as exc:result['native_automation']={'status':'UNKNOWN','warning':str(exc)}
+    try:result['sequence_length']=sequence_length(data)
+    except ValueError:result['sequence_length']=None
 
     # The state area ends at SEQ_START.  Each sequence page is length-prefixed;
     # the first 192 bytes are the confirmed core and any remaining bytes are

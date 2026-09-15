@@ -18,8 +18,9 @@ def _documents_folder():
     return Path.home()/'Documents'
 
 DOCUMENTS=_documents_folder()
-ROOT=DOCUMENTS/'IK Multimedia'/'UNO Synth Pro Editor'
-PRESETS=ROOT
+LEGACY_ROOT=DOCUMENTS/'IK Multimedia'/'UNO Synth Pro Editor'
+ROOT=Path(os.environ.get('LOCALAPPDATA',str(Path.home()/'AppData'/'Local')))/'UnoLive'
+PRESETS=LEGACY_ROOT
 SONGS=ROOT/'songs'
 SETTINGS=ROOT/'settings.json'
 DEFAULT={'midi_in':'UNO Synth Pro','midi_out':'UNO Synth Pro','midi_controller':'Off','midi_in_channel':1,'midi_out_channel':1,'midi_clock':'Off','sync':'Internal','pr_change':True,'midi_interface':'Auto','pitch_bend_range':2,'keyboard_visible':False,'live_delay':0,'ui_scale':'100%','live_slots':[None]*64}
@@ -27,12 +28,13 @@ _preset_cache=None
 _preset_cache_sig=None
 
 def ensure_dirs():
-    ROOT.mkdir(parents=True,exist_ok=True);SONGS.mkdir(parents=True,exist_ok=True)
+    ROOT.mkdir(parents=True,exist_ok=True)
 
 def load_settings():
     d=dict(DEFAULT);d['live_slots']=list(DEFAULT['live_slots'])
     try:
-        if SETTINGS.exists():d.update(json.loads(SETTINGS.read_text(encoding='utf-8')))
+        source=SETTINGS if SETTINGS.exists() else LEGACY_ROOT/'settings.json'
+        if source.exists():d.update(json.loads(source.read_text(encoding='utf-8')))
     except (OSError,json.JSONDecodeError,TypeError,ValueError) as e:logger.warning('Failed to load settings %s: %s',SETTINGS,e)
     if not d.get('scale_restored_v092'):
         d['ui_scale']='100%';d['scale_restored_v092']=True
@@ -90,6 +92,7 @@ def categories():return ['All']+sorted({x[1] for x in _all_presets() if x[1]!='A
 def save_preset(preset,category=None):
     ensure_dirs()
     if category:preset.category=category
+    PRESETS.mkdir(parents=True,exist_ok=True)
     p=PRESETS/(_safe(preset.name)+'.unosyp');i=2
     while p.exists():p=PRESETS/f'{_safe(preset.name)} {i}.unosyp';i+=1
     preset.save(p);invalidate_preset_cache();return p
@@ -98,6 +101,7 @@ def load_preset(path):
     d=json.loads(Path(path).read_text(encoding='utf-8'));sd=d.get('sequence',{});seq=Sequence(length=int(sd.get('length',16)),direction=sd.get('direction','Forward'),transpose=int(sd.get('transpose',0)))
     ss=sd.get('steps',[]);seq.steps=[Step(**x) for x in ss[:64]]+[Step() for _ in range(max(0,64-len(ss)))];seq.automation=sd.get('automation',seq.automation)
     seq.length_confirmed=bool(sd.get('length_confirmed',True));seq.binary_page_headers=list(sd.get('binary_page_headers',[]));seq.binary_page_metadata=list(sd.get('binary_page_metadata',[]));seq.binary_page_payloads=list(sd.get('binary_page_payloads',[]))
+    seq.native_automation=sd.get('native_automation',{});seq.native_raw_hex=sd.get('native_raw_hex','')
     return Preset(d.get('name','INIT'),d.get('number'),d.get('params',{}),seq,d.get('tags',[]),d.get('category','My Presets'),d.get('source','local'))
 
 
@@ -110,10 +114,14 @@ def load_binary_unosyp_state(path):
 def load_binary_unosyp_sequence(path):
     """Read-only decode of the confirmed 1081-byte UNO .unosyp sequencer."""
     from unosyp_seq_decoder import parse_unosyp
-    info=parse_unosyp(Path(path).read_bytes())
+    from native_automation import read_automation,sequence_length
+    raw=Path(path).read_bytes();info=parse_unosyp(raw)
     if not info.get('supported_sequence_variant'):
         return None
-    seq=Sequence();seq.length_confirmed=False
+    seq=Sequence();seq.length_confirmed=True
+    seq.native_raw_hex=raw.hex()
+    try:seq.native_automation=read_automation(raw)
+    except ValueError as exc:seq.native_automation={'status':'UNKNOWN','warning':str(exc)}
     seq.binary_page_headers=[p.get('header_hex','') for p in info.get('pages',[])]
     seq.binary_page_metadata=[p.get('metadata_hex','') for p in info.get('pages',[])]
     seq.binary_page_payloads=[(p.get('packed_hex','').replace(' ','') + p.get('extension_hex','').replace(' ','')).lower() for p in info.get('pages',[])]
@@ -132,7 +140,8 @@ def load_binary_unosyp_sequence(path):
         st.control_raw=int(decoded.get('control_raw',0))&0xFF
         if vels:st.velocity=vels[0]
         if notes:active_last=idx+1
-    seq.length=max(16,active_last)
+    try:seq.length=sequence_length(raw)
+    except ValueError:seq.length_confirmed=False
     return seq
 
 def child_folders(folder):
@@ -171,7 +180,7 @@ def list_songs():
     return sorted(SONGS.glob('*.unosong'),key=lambda p:p.stem.lower())
 
 def save_song(song):
-    ensure_dirs();p=SONGS/(_safe(song.name)+'.unosong');song.save(p);return p
+    ensure_dirs();SONGS.mkdir(parents=True,exist_ok=True);p=SONGS/(_safe(song.name)+'.unosong');song.save(p);return p
 
 # UNO Pro Advanced local-only metadata. Never written into UNO preset files or sent to hardware.
 METADATA=ROOT/'uno_pro_advanced_metadata.json'
@@ -184,7 +193,8 @@ def _metadata_key(path):
 
 def _load_metadata_db():
     try:
-        d=json.loads(METADATA.read_text(encoding='utf-8'))
+        source=METADATA if METADATA.exists() else LEGACY_ROOT/'uno_pro_advanced_metadata.json'
+        d=json.loads(source.read_text(encoding='utf-8'))
         return d if isinstance(d,dict) else {}
     except Exception:return {}
 

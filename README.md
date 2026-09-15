@@ -1,7 +1,7 @@
-# UNO Pro Advanced v0.9.2-beta
+# UNO Pro Advanced v0.10.0-alpha
 
-Cumulative from legacy v1.64 FIX2. Windows, Python 3.12+, Pillow. Run run_editor.bat.
+Cumulative integration of main v0.9.5-beta and Live Creator v0.6-alpha. Windows, Python 3.12+, Tkinter and Pillow. Run run_editor.bat. This is a source release, not an autonomous EXE.
 
-[Русский](README.ru.md) · [Release notes](Docs/RELEASE_NOTES_v0.9.2-beta.md) · [Validation](Docs/VALIDATION_v0.9.2-beta.md)
+[Русский](README.ru.md) · [Integration report](Docs/INTEGRATION_v0.10.0-alpha.md) · [Changelog](CHANGELOG.md)
 
-Restores scale presets (100% default), original sequencer FILL/hint, and legacy SAVE. SAVE AS remains only in the topbar. Working-file/project-folder tracking and unsaved-change prompts have been removed.
+LIVE is embedded in the main window. LENGTH, Dupl, parameter Automation selector, native raw reader and global themes are included. STORE remains locked. Native event mapping/writer and Live Creator hardware playback remain PARTIAL/UNVERIFIED. Settings/state/logs use %LOCALAPPDATA%\UnoLive; original presets remain in their user folder.

@@ -8,3 +8,6 @@ venv/
 Docs/test[2-5].unosyp
 .snapshot_chunks/
 SYNC_NOTE.txt
+builds/
+LiveCreatorState.json
+tests/review-*/
