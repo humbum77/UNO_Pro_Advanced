@@ -18,6 +18,7 @@ from protocol_map import *
 from state_decoder import decode_state_0x37
 from unosyp_state_decoder import decode_0x37_raw,decode_extended_preset_fields
 from hardware_seq_0x29 import parse_0x29_response,apply_to_sequence
+from ui_layout import Viewport,split_columns,three_columns
 
 MATRIX_SOURCES=['Velocity','Mod Wheel','Aftertouch','Key Pitch','Key Gate','Osc 1 Tune','Osc 1 Level','Osc 2 Tune','Osc 2 Level','Osc 3 Tune','Osc 3 Level','Noise','Filter 1 Cutoff','Filter 1 Res','Filter 2 Cutoff','Filter 2 Res','Filter Spacing','LFO 1','LFO 1 Fade In','LFO 2','LFO 2 Fade In','Filter Env','Amp Env','CV 1 IN','GATE 1 IN','CV 2 IN','GATE 2 IN','Accent','Gate','Tie']
 MATRIX_DESTINATIONS=['OFF','Osc 1 Tune','Osc 1 Wave','Osc 1 Level','Osc 2 Tune','Osc 2 Wave','Osc 2 Level','Osc 2 FM Amount','Osc 3 Tune','Osc 3 Wave','Osc 3 Level','Osc 3 FM Amount','Noise level','Filter 1 Cutoff','Filter 1 Res','Filter 2 Cutoff','Filter 2 Res','Filter Spacing','LFO 1 Wave','LFO 1 Rate','LFO 2 Wave','LFO 2 Rate','Filter 1 Env Amount','Filter 2 Env Amount','Amp Env Amount','Drive Amount','Delay Amount','Reverb Amount','Mod Amount','CV OUT 1','GATE OUT 1','CV OUT 2','GATE OUT 2','Accent Amount']+[f'Mod {i} Amount' for i in range(1,17)]
@@ -51,7 +52,7 @@ class App(tk.Tk):
   self.song_mode='SONG';self.preset=Preset();self.song=Song();self.selected_song_file=None
   self.live_editor=None;self.automation_parameter='CUTOFF 1';ui_theme.set_theme('dark')
   self.configure(bg=ui_theme.color(BG));self.canvas.configure(bg=ui_theme.color(BG))
-  self.scale=1;self.ox=0;self.oy=0;self.hit=[];self.drag=None;self.popup=None;self.status='OFFLINE';self._closing=False;self._graph_images=[];self.selected_seq_step=0;self.selected_seq_note=None;self.seq_visible=16;self.seq_hscroll=0;self.seq_note_low=36;self.seq_param='GATE';self.seq_mod=0;self.seq_overdub='MONO';self.seq_resolution='1/16';self.seq_timing='STRAIGHT';self.seq_swing=0;self.seq_clipboard=None;self.selected_song_slot=0;self.selected_live_slot=0;self.song_preset_folder=storage.PRESETS;self.song_folder_scroll=0;self.live_slots=(list(self.settings.get('live_slots',[]))[:64]+[None]*64)[:64];self.lib_category='All';self.lib_query='';self.lib_selected=None;self.hardware_selected=1;self.preview=True;self.preset_source='HARDWARE';self.preset_folder=None;self.lib_panel_source=['LOCAL','UNO'];self.lib_panel_folder=[storage.PRESETS,None];self.lib_scroll=[0,0];self.lib_hscroll=[0,0];self.lib_expanded=set();self.lib_star_filter=False;self.lib_color_filters=set();self.lib_right_mode='UNO';self.lib_right_folder=None;self._lib_folder_entry=None;self._lib_folder_entry_window=None;self._lib_tooltip_job=None;self._lib_tooltip=None;self._mod_tooltip_job=None;self._mod_tooltip=None;self.keys_down=set();self.hw_keys_down=set();self.pitch_visual=0;self.open_dropdown=None;self.dropdown_scroll=0;self.dropdown_hover=None;self._lib_search_entry=None;self._lib_clipboard=None;self._lib_folder_clipboard=None;self._lib_drag_origin=None;self._lib_drag_started=False;self._lib_drag_pos=None;self.lib_focus=0;self.lib_hw_selected=1;self._seq_fill_flash=False;self.song_tree_expanded={str(storage.PRESETS)};self.song_tree_selected=storage.PRESETS;self.matrix_scroll=0;self.seq_playing=False;self.seq_recording=False;self.seq_record_step=0;self.seq_metronome=False;self.seq_count_in='OFF';self.seq_quantize='OFF';self.seq_groove='STRAIGHT';self.seq_groove_amount=0;self._seq_countin_job=None;self._seq_countin_left=0;self.transpose_mode=False;self.transpose_preview=0;self._transpose_original=0;self._transport_anim_job=None;self._seq_clock_count=0;self.arp_on=False;self._seq_active_notes=set();self._seq_noteoff_jobs={};self._seq_last_clock_time=None;self._seq_clock_interval=0.020833;self._rx_bank=0;self.hardware_names={};self._catalog_slot=0;self._catalog_active=False;self._catalog_job=None;self._catalog_timeout_job=None;self._catalog_retry=0;self._hw_refresh_job=None;self._hw_name_job=None;self._hw_seq_job=None;self._hw_seq_timeout_job=None;self._hw_seq_slot=None;self._hw_seq_pages={};self._hw_seq_expected_page=None;self._last_state_dump=None;self.sequence_origin='HARDWARE_STATE_ONLY';self.live_delay=int(self.settings.get('live_delay',0));self.live_playing=False;self.live_countdown_remaining=0;self._live_countdown_job=None
+  self.scale=1;self.ox=0;self.oy=0;self.layout_w=float(BASE_W);self.hit=[];self.drag=None;self.popup=None;self.status='OFFLINE';self._closing=False;self._graph_images=[];self.selected_seq_step=0;self.selected_seq_note=None;self.seq_visible=16;self.seq_hscroll=0;self.seq_note_low=36;self.seq_param='GATE';self.seq_mod=0;self.seq_overdub='MONO';self.seq_resolution='1/16';self.seq_timing='STRAIGHT';self.seq_swing=0;self.seq_clipboard=None;self.selected_song_slot=0;self.selected_live_slot=0;self.song_preset_folder=storage.PRESETS;self.song_folder_scroll=0;self.live_slots=(list(self.settings.get('live_slots',[]))[:64]+[None]*64)[:64];self.lib_category='All';self.lib_query='';self.lib_selected=None;self.hardware_selected=1;self.preview=True;self.preset_source='HARDWARE';self.preset_folder=None;self.lib_panel_source=['LOCAL','UNO'];self.lib_panel_folder=[storage.PRESETS,None];self.lib_scroll=[0,0];self.lib_hscroll=[0,0];self.lib_expanded=set();self.lib_star_filter=False;self.lib_color_filters=set();self.lib_right_mode='UNO';self.lib_right_folder=None;self._lib_folder_entry=None;self._lib_folder_entry_window=None;self._lib_tooltip_job=None;self._lib_tooltip=None;self._mod_tooltip_job=None;self._mod_tooltip=None;self.keys_down=set();self.hw_keys_down=set();self.pitch_visual=0;self.open_dropdown=None;self.dropdown_scroll=0;self.dropdown_hover=None;self._lib_search_entry=None;self._lib_clipboard=None;self._lib_folder_clipboard=None;self._lib_drag_origin=None;self._lib_drag_started=False;self._lib_drag_pos=None;self.lib_focus=0;self.lib_hw_selected=1;self._seq_fill_flash=False;self.song_tree_expanded={str(storage.PRESETS)};self.song_tree_selected=storage.PRESETS;self.matrix_scroll=0;self.seq_playing=False;self.seq_recording=False;self.seq_record_step=0;self.seq_metronome=False;self.seq_count_in='OFF';self.seq_quantize='OFF';self.seq_groove='STRAIGHT';self.seq_groove_amount=0;self._seq_countin_job=None;self._seq_countin_left=0;self.transpose_mode=False;self.transpose_preview=0;self._transpose_original=0;self._transport_anim_job=None;self._seq_clock_count=0;self.arp_on=False;self._seq_active_notes=set();self._seq_noteoff_jobs={};self._seq_last_clock_time=None;self._seq_clock_interval=0.020833;self._rx_bank=0;self.hardware_names={};self._catalog_slot=0;self._catalog_active=False;self._catalog_job=None;self._catalog_timeout_job=None;self._catalog_retry=0;self._hw_refresh_job=None;self._hw_name_job=None;self._hw_seq_job=None;self._hw_seq_timeout_job=None;self._hw_seq_slot=None;self._hw_seq_pages={};self._hw_seq_expected_page=None;self._last_state_dump=None;self.sequence_origin='HARDWARE_STATE_ONLY';self.live_delay=int(self.settings.get('live_delay',0));self.live_playing=False;self.live_countdown_remaining=0;self._live_countdown_job=None
   self.values={}
   self.env_gate=False;self.env_release=False;self.env_phase_start=0.0;self.env_level_at_release=0.0;self.env_release_levels={'FENV':0.0,'AENV':0.0};self.anim_values={};self.filter_link=64;self._numeric_entry=None;self._anim_last=time.monotonic();self._anim_job=None;self._env_hover=None
   self._defaults();self.midi=MidiEngine(self._midi_rx);self._midi_inputs=[];self._midi_outputs=[];self._midi_apply_busy=False;self._midi_apply_result=queue.Queue();self._midi_ports_busy=False;self._midi_ports_result=queue.Queue();self._midi_close_result=queue.Queue();self._midi_close_deadline=0.0;self._cc_last_sent={};self._cc_pending={};self._cc_jobs={};self._cc_interval=0.008;self._midi_rx_queue=queue.Queue();self._midi_rx_job=None;self._popup_clear_job=None
@@ -722,8 +723,8 @@ class App(tk.Tk):
  def redraw(self):
   if self._closing:return
   if not self.winfo_exists():return
-  self.canvas.delete('all');self.hit=[];self._graph_images=[];w=max(1,self.canvas.winfo_width());h=max(1,self.canvas.winfo_height());design_h=self._design_height();self.scale=min(w/BASE_W,h/design_h);self.ox=(w-BASE_W*self.scale)/2;self.oy=0
-  self.rect(0,0,BASE_W,design_h,BG,BG);self.topbar()
+  self.canvas.delete('all');self.hit=[];self._graph_images=[];w=max(1,self.canvas.winfo_width());h=max(1,self.canvas.winfo_height());design_h=self._design_height();viewport=Viewport.fit(w,h,design_h);self.scale=viewport.scale;self.layout_w=viewport.logical_width;self.ox=0;self.oy=0
+  self.rect(0,0,self.layout_w,design_h,BG,BG);self.topbar()
   if self.page=='SYNTH':self.draw_synth()
   elif self.page=='ARP + SEQUENCER':self.draw_seq()
   elif self.page=='SONG':self.draw_live_creator()
@@ -741,7 +742,7 @@ class App(tk.Tk):
   if self._lib_drag_started and self._lib_drag_pos:self._draw_library_drag_feedback()
   # Bottom MIDI service status intentionally hidden in the production UI.
  def topbar(self):
-  self.rect(0,0,BASE_W,52,'#0d1113','#0d1113')
+  self.rect(0,0,self.layout_w,52,'#0d1113','#0d1113')
   x=12
   for p,w in [('SYNTH',95),('ARP + SEQUENCER',180),('LIBRARY',95),('SONG',80)]:self.button(x,8,w,34,'LIVE' if p=='SONG' else p,self.page==p,lambda p=p:self.set_page(p),size=11);x+=w+6
   if self.page in ('SYNTH','ARP + SEQUENCER'):
@@ -750,10 +751,11 @@ class App(tk.Tk):
    self.button(590,8,104,34,'RANDOM',False,rand_action,size=9)
    self.button(700,8,34,34,'◀',False,lambda:self.change_preset(-1));self.button(740,8,190,34,self._preset_selector_label(),False,self.open_preset_tree,size=9);self.button(936,8,34,34,'▶',False,lambda:self.change_preset(1))
    self.button(982,8,72,34,'INIT',False,init_action,size=9)
-  self.button(1066,8,100,34,'SAVE AS',False,self.save_local_preset_as,size=10)
-  self.button(1174,8,82,34,'SAVE',False,self.save_local_preset,size=10);self.button(1260,8,82,34,'STORE',False,self.store_locked,size=10);self.button(1350,8,43,34,'⚙',self.page=='SETTINGS',lambda:self.set_page('SETTINGS'),key='Settings',size=16)
-  self.button(1496,8,43,34,'⛶',False,self._show_scale_menu,size=15)
-  self.keyboard_icon_button(1545,8,43,34)
+  right=self.layout_w-534
+  self.button(right,8,100,34,'SAVE AS',False,self.save_local_preset_as,size=10)
+  self.button(right+108,8,82,34,'SAVE',False,self.save_local_preset,size=10);self.button(right+194,8,82,34,'STORE',False,self.store_locked,size=10);self.button(right+284,8,43,34,'⚙',self.page=='SETTINGS',lambda:self.set_page('SETTINGS'),key='Settings',size=16)
+  self.button(right+430,8,43,34,'⛶',False,self._show_scale_menu,size=15)
+  self.keyboard_icon_button(right+479,8,43,34)
 
  def keyboard_icon_button(self,x,y,w,h):
   active=self.keyboard_visible;self.rect(x,y,w,h,'#2b3034' if active else PANEL2,LIGHT_GREY if active else EDGE,1)
@@ -771,7 +773,7 @@ class App(tk.Tk):
    self.live_editor=LiveCreator(master=self)
    self.live_editor.apply_theme()
   top=self.Y(52);height=self.S(BASE_H-52)
-  self.live_editor.place(x=self.X(0),y=top,width=self.S(BASE_W),height=height)
+  self.live_editor.place(x=self.X(0),y=top,width=self.S(self.layout_w),height=height)
   self.live_editor.lift()
  def toggle_keyboard(self):
   self.keyboard_visible=not self.keyboard_visible
@@ -1270,7 +1272,8 @@ class App(tk.Tk):
   # v1.26 — fixed-size step grid, synced horizontal scrolling, vertical note scroll,
   # polymetric STEPS 1..64, active/inactive shading, 12-note chromatic colors.
   bottom=982
-  self.rect(10,60,295,bottom-60);self.pad_surface(20,68,273,34,PANEL2,EDGE,1,7);self.text(156.5,85,'ARPEGGIATOR',15,TEXT,'center',True)
+  (left_x,left_w),(sx,sw),(rx,rw)=three_columns(self.layout_w)
+  self.rect(left_x,60,left_w,bottom-60);self.pad_surface(left_x+10,68,left_w-22,34,PANEL2,EDGE,1,7);self.text(left_x+left_w/2,85,'ARPEGGIATOR',15,TEXT,'center',True)
   self.transport_button(28,108,120,46,'ON',GREEN,self.arp_on,self.toggle_arp_on);self.transport_button(160,108,123,46,'HOLD',LIGHT_GREY,self.toggle['ARP_HOLD'],lambda:self.toggle_param('ARP_HOLD'))
   self.text(28,178,'MODE',9,MUTED);self.dropdown(112,166,171,38,ARP_MODES[self.choice['ARP_MODE']],'ARP_MODE',ARP_MODES)
   self.text(28,232,'RANGE',9,MUTED);self.dropdown(112,220,171,38,'1 OCT','ARP_RANGE',['1 OCT','2 OCT','3 OCT','4 OCT'])
@@ -1279,9 +1282,9 @@ class App(tk.Tk):
   for i in range(16):
    r=i//8;c=i%8;self.button(28+c*32,562+r*46,27,38,str(i+1),self.arp_trig[i],lambda i=i:self.toggle_arp(i),size=8)
 
-  sx,sy,sw=315,60,940;self.rect(sx,sy,sw,bottom-sy);self.pad_surface(sx+10,68,sw-20,34,PANEL2,EDGE,1,7);self.text(sx+sw/2,85,'SEQUENCER',15,TEXT,'center',True)
+  sy=60;self.rect(sx,sy,sw,bottom-sy);self.pad_surface(sx+10,68,sw-20,34,PANEL2,EDGE,1,7);self.text(sx+sw/2,85,'SEQUENCER',15,TEXT,'center',True)
   # 16 fixed-width columns are visible. More steps never shrink the cells.
-  kx,ky,kw,kh=324,118,74,398;grid_x=398;grid_w=830;visible=16;cw=grid_w/visible
+  kx,ky,kw,kh=sx+9,118,74,398;grid_x=kx+kw;grid_w=max(320,sw-110);visible=16;cw=grid_w/visible
   seq_len=max(1,min(64,int(self.preset.sequence.length)))
   self.seq_hscroll=max(0,min(self.seq_hscroll,max(0,64-visible)))
   first=self.seq_hscroll
@@ -1331,13 +1334,13 @@ class App(tk.Tk):
   if loaded_notes and min(loaded_notes)<self.seq_note_low:self.text(grid_x+grid_w-9,ky+kh-7,'▼',8,MUTED,'se',True)
   self.hitbox(grid_x,ky,grid_w,kh,'pianoroll','SEQ',{'gx':grid_x,'gy':ky,'gw':grid_w,'gh':kh,'visible':visible,'first':first,'rows':rows,'top_note':top_note})
   # Visible vertical scrollbar for full C0..C7 range.
-  vsx=1235;self.line(vsx,ky+4,vsx,ky+kh-4,EDGE,4);vrange=(96-rows+1)-12;thumbh=max(36,(kh-8)*rows/85);frac=(self.seq_note_low-12)/vrange if vrange else 0;vty=ky+4+((kh-8)-thumbh)*(1-frac);self.line(vsx,vty,vsx,vty+thumbh,LIGHT_GREY,5);self.hitbox(vsx-8,ky,16,kh,'seq_vscroll',None,{'y':ky,'h':kh,'thumb':thumbh,'range':vrange})
+  vsx=grid_x+grid_w+7;self.line(vsx,ky+4,vsx,ky+kh-4,EDGE,4);vrange=(96-rows+1)-12;thumbh=max(36,(kh-8)*rows/85);frac=(self.seq_note_low-12)/vrange if vrange else 0;vty=ky+4+((kh-8)-thumbh)*(1-frac);self.line(vsx,vty,vsx,vty+thumbh,LIGHT_GREY,5);self.hitbox(vsx-8,ky,16,kh,'seq_vscroll',None,{'y':ky,'h':kh,'thumb':thumbh,'range':vrange})
   for col in range(visible):self.text(grid_x+(col+.5)*cw,528,str(first+col+1),8,TEXT if first+col<seq_len else MUTED,'center')
 
   head_y=548;bx=grid_x
   for pnm in ('GATE','ACC','VELOCITY','LENGTH'):
    self.button(bx,head_y,98,42,pnm,self.seq_param==pnm,lambda pnm=pnm:self.set_seq_param(pnm),size=8);bx+=102
-  self.button(1124,head_y,116,42,'TIE',False,self.toggle_selected_tie,size=8)
+  self.button(grid_x+grid_w-116,head_y,116,42,'TIE',False,self.toggle_selected_tie,size=8)
   py,ph=598,146;self.rect(grid_x,py,grid_w,ph,'#10171a',EDGE)
   for col in range(visible):
    sidx=first+col;x=grid_x+col*cw
@@ -1348,7 +1351,7 @@ class App(tk.Tk):
    self.play_indicator(px,py,cw,ph)
   for col in range(visible+1):
    absolute=first+col;major=(absolute%4==0);self.line(grid_x+col*cw,py,grid_x+col*cw,py+ph,'#56636a' if major else '#263238',2 if major else 1)
-  self.text(340,py+5,'100',8,TEXT);self.text(350,py+ph/2,'50',8,TEXT);self.text(358,py+ph-4,'0',8,TEXT,'sw')
+  self.text(grid_x-58,py+5,'100',8,TEXT);self.text(grid_x-48,py+ph/2,'50',8,TEXT);self.text(grid_x-40,py+ph-4,'0',8,TEXT,'sw')
   for col in range(visible):
    sidx=first+col;st=self.preset.sequence.steps[sidx]
    if self.seq_param=='GATE':t=clamp(st.gate/10,0,1)
@@ -1400,7 +1403,7 @@ class App(tk.Tk):
   # Shared horizontal scrollbar directly under Piano Roll; controls Piano Roll / Step Parameter / LINE automation together.
   hsy=538;self.line(grid_x,hsy,grid_x+grid_w,hsy,EDGE,4);thumbw=grid_w*visible/64;htx=grid_x+(grid_w-thumbw)*(first/(64-visible));self.line(htx,hsy,htx+thumbw,hsy,LIGHT_GREY,5);self.hitbox(grid_x,hsy-8,grid_w,16,'seq_hscroll',None,{'x':grid_x,'w':grid_w,'thumb':thumbw})
 
-  rx=1265;rw=325;self.rect(rx,60,rw,bottom-60)
+  self.rect(rx,60,rw,bottom-60)
   self.button(rx+14,78,145,48,'PLAY ▶',self.seq_playing,self.toggle_seq_play);self.button(rx+166,78,145,48,'REC ●',self.seq_recording,self.toggle_seq_record)
   # One SEQUENCE SETTINGS frame, agreed order.
   sy0=140;self.rect(rx+10,sy0,rw-20,490);self.text(rx+24,sy0+16,'SEQUENCE SETTINGS',13,bold=True)
@@ -1475,16 +1478,16 @@ class App(tk.Tk):
    self.text(rx+rw/2,476,'5–60 seconds',8,MUTED,'center');self.text(rx+rw/2,520,'The 4×16 grid is identical to SONG.\nEach cell holds a saved song.',9,MUTED,'center')
  def set_song_mode(self,m):self.song_mode=m;self.redraw()
  def draw_library(self):
-  self.rect(12,62,1576,920)
+  self.rect(12,62,self.layout_w-24,920)
   self.text(30,82,'PRESET LIBRARY',17,bold=True)
   # LEFT: permanent LOCAL library. RIGHT: UNO by default, or a LOCAL folder opened from the tree.
   # v1.63: three visible LOCAL preset columns, two visible right-panel columns, clear separation.
-  left_x=24;left_w=900;gap=28;right_x=left_x+left_w+gap;right_w=612
+  gap=28;(left_x,left_w),(right_x,right_w)=split_columns(self.layout_w,(3,2),margin=24,gap=gap)
   self._draw_local_panel(left_x,125,left_w,780)
   # Clean inter-panel gap also masks any partially scrolled LOCAL text.
   self.rect(left_x+left_w,125,gap,780,BG,BG)
   self._draw_right_panel(right_x,125,right_w,780)
-  self.rect(right_x+right_w,125,max(0,BASE_W-(right_x+right_w)),780,BG,BG)
+  self.rect(right_x+right_w,125,max(0,self.layout_w-(right_x+right_w)),780,BG,BG)
   if self._lib_tooltip:
    tx,ty,msg=self._lib_tooltip;tw=max(70,14+len(msg)*7)
    self.rect(tx,ty,tw,26,'#07090a',LIGHT_GREY);self.text(tx+8,ty+13,msg,8,TEXT,'w')
@@ -1767,16 +1770,17 @@ class App(tk.Tk):
  def _toggle_preset_tag(self,path,i):
   m=storage.get_preset_metadata(path);c=set(m.get('colors',[]));c.remove(i) if i in c else c.add(i);m['colors']=sorted(c);storage.set_preset_metadata(path,m);self.redraw()
  def draw_settings(self):
-  self.rect(16,70,760,820);self.rect(790,70,794,820);self.text(42,95,'MIDI SETTINGS',18,bold=True);self.text(820,95,'ABOUT',18,bold=True)
+  (left_x,left_w),(right_x,right_w)=split_columns(self.layout_w,(1,1),margin=16,gap=14)
+  self.rect(left_x,70,left_w,820);self.rect(right_x,70,right_w,820);self.text(left_x+26,95,'MIDI SETTINGS',18,bold=True);self.text(right_x+30,95,'ABOUT',18,bold=True)
   in_cur=self.settings.get('midi_in','UNO_RETURN');out_cur=self.settings.get('midi_out','UNO_TAP');ctrl_cur=self.settings.get('midi_controller','Off')
   ins=list(dict.fromkeys(([in_cur] if in_cur else [])+self._midi_inputs)) or ['UNO_RETURN'];outs=list(dict.fromkeys(([out_cur] if out_cur else [])+self._midi_outputs)) or ['UNO_TAP'];controllers=list(dict.fromkeys(['Off']+([ctrl_cur] if ctrl_cur and ctrl_cur!='Off' else [])+self._midi_inputs))
   rows=[('MIDI IN','midi_in',ins),('MIDI OUT','midi_out',outs),('MIDI CONTROLLER','midi_controller',controllers),('MIDI IN CHANNEL','midi_in_channel',['OMNI']+list(range(1,17))),('MIDI OUT CHANNEL','midi_out_channel',list(range(1,17))),('MIDI CLOCK','midi_clock',['Off','MIDI MASTER']),('SYNC','sync',['Internal','External','USB']),('MIDI INTERFACE','midi_interface',['Auto','Off','On'])]
   for i,(lab,key,opts) in enumerate(rows):
-   y=145+i*82;self.text(55,y,lab,11,MUTED);self.settings_dropdown(320,y-10,410,40,self._display_setting(self.settings.get(key,opts[0])),key,opts)
-  self.text(820,155,'UNO Pro Advanced',20,TEXT,bold=True);self.text(820,192,'Version 0.9.7-beta',11,MUTED)
-  self.text(820,240,'Editor / librarian for IK Multimedia UNO Synth Pro',10,TEXT)
-  self.text(820,270,'Hardware STORE remains locked until 0x28 is fully validated.',9,MUTED)
-  self.button(530,820,202,44,'APPLY',self.settings_dirty,self.apply_settings if self.settings_dirty else None)
+   y=145+i*82;self.text(left_x+39,y,lab,11,MUTED);self.settings_dropdown(left_x+304,y-10,max(280,left_w-350),40,self._display_setting(self.settings.get(key,opts[0])),key,opts)
+  self.text(right_x+30,155,'UNO Pro Advanced',20,TEXT,bold=True);self.text(right_x+30,192,'Version 0.9.7-beta',11,MUTED)
+  self.text(right_x+30,240,'Editor / librarian for IK Multimedia UNO Synth Pro',10,TEXT)
+  self.text(right_x+30,270,'Hardware STORE remains locked until 0x28 is fully validated.',9,MUTED)
+  self.button(left_x+left_w-246,820,202,44,'APPLY',self.settings_dirty,self.apply_settings if self.settings_dirty else None)
 
  def apply_midi(self):
   self._start_midi_connect(save=True,initial=False)
@@ -1816,7 +1820,7 @@ class App(tk.Tk):
   ranges=[2,4,6,8,12,24];cur=int(self.settings.get('pitch_bend_range',2));cur=cur if cur in ranges else 2
   rx=202;self.text(rx+46,y+16,'PB RANGE',8,MUTED,'center');self.button(rx,y+32,30,38,'◀',False,lambda:self._step_pb_range(-1),size=9);self.text(rx+46,y+51,str(cur),13,TEXT,'center',True);self.button(rx+62,y+32,30,38,'▶',False,lambda:self._step_pb_range(1),size=9);self.button(rx,y+82,92,38,'TRANSPOSE',self.transpose_mode,self.toggle_transpose_mode,size=8)
   # Three octaves, stretched to the full available panel height; width follows key proportions.
-  kx=312;kh=panel_h-8;ky=y+4;octs=3;white_count=octs*7;kw=1260;ww=kw/white_count;start=max(0,min(91,36+self.keyboard_octave_shift*12));active=self.keys_down|self.hw_keys_down
+  kx=312;kh=panel_h-8;ky=y+4;octs=3;white_count=octs*7;kw=max(420,self.layout_w-kx-28);ww=kw/white_count;start=max(0,min(91,36+self.keyboard_octave_shift*12));active=self.keys_down|self.hw_keys_down
   whites=[n for n in range(start,start+octs*12+1) if n%12 not in (1,3,6,8,10)]
   for i,n in enumerate(whites[:white_count]):
    pressed=n in active;off=3 if pressed else 0;x=kx+i*ww
@@ -2347,7 +2351,7 @@ class App(tk.Tk):
    # Large multi-column parameter picker: maximum options visible at once, no scrolling when they fit.
    row=29;panel_top=95;panel_bottom=820;max_rows=12 if d['key']=='SEQ_TARGET' else max(1,int((panel_bottom-panel_top-20)//row));cols=max(1,(len(vals)+max_rows-1)//max_rows);rows=min(max_rows,(len(vals)+cols-1)//cols)
    cell_w=285 if d['key'].startswith('MDST') else 245;panel_w=cols*cell_w+20;panel_h=rows*row+20
-   left=clamp(d['x'],18,BASE_W-panel_w-18);top=clamp(d['y']-panel_h/2,75,BASE_H-panel_h-120)
+   left=clamp(d['x'],18,self.layout_w-panel_w-18);top=clamp(d['y']-panel_h/2,75,BASE_H-panel_h-120)
    self.rect(left,top,panel_w,panel_h,'#11171a',LIGHT_GREY,1)
    for i,opt in enumerate(vals):
     col=i//rows;r=i%rows;xx=left+10+col*cell_w;yy=top+10+r*row;sel=(opt==cur);hov=(opt==self.dropdown_hover)
@@ -2358,7 +2362,7 @@ class App(tk.Tk):
     self.hitbox(xx,yy,cell_w-8,row-2,'dropdown_item',d['key'],opt)
    return
   n=min(10,len(vals));off=max(0,min(self.dropdown_scroll,max(0,len(vals)-n)));self.dropdown_scroll=off
-  x,y,w,h=d['x'],d['y'],d['w'],d['h'];row=max(28,h);down_space=BASE_H-(y+h)-8;up_space=y-8
+  x,y,w,h=d['x'],d['y'],d['w'],d['h'];row=max(28,h);down_space=self._design_height()-(y+h)-8;up_space=y-8
   below=down_space>=row*n or down_space>=up_space;top=(y+h if below else y-row*n)
   self.rect(x,top,w,row*n,'#11171a',LIGHT_GREY if vals else EDGE,1)
   for j,opt in enumerate(vals[off:off+n]):

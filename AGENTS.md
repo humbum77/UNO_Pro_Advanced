@@ -1,6 +1,7 @@
 # UNO Pro Advanced — integration rules (2026-09-15)
 
 Текущая версия основной линии: **v0.9.7-beta**, после v0.9.6-beta. Alpha-статус standalone Live Creator не переносится на основную программу. Прежнее обозначение v0.10.0-alpha было ошибочным локальным названием, не отдельным согласованным релизом. История сохраняется.
+Текущая экспериментальная работа ведётся только в `test/v0.9.7-next`. `main` и `release/v0.9.7-beta` служат резервными точками и не изменяются без отдельной команды.
 Актуальные документы релиза: `Docs/PROJECT_STATE.md`, `Docs/DECISIONS.md`, `Docs/RELEASE_NOTES_v0.9.7-beta.md` и `CHANGELOG.md`. Старые standalone build rules ниже относятся только к истории.
 Общие документы `D:\UNO\docs\PROJECT_STATE.md` и `DECISIONS.md` синхронизируются с `Docs/PROJECT_STATE.md` и `Docs/DECISIONS.md` в репозитории для отправки на GitHub. Не повышать PARTIAL/UNKNOWN или hardware status при исправлении версии.
 
