@@ -18,7 +18,7 @@ from protocol_map import *
 from state_decoder import decode_state_0x37
 from unosyp_state_decoder import decode_0x37_raw,decode_extended_preset_fields
 from hardware_seq_0x29 import parse_0x29_response,apply_to_sequence
-from ui_layout import Viewport,split_columns,three_columns
+from ui_layout import Viewport,split_columns,synth_columns,three_columns
 
 MATRIX_SOURCES=['Velocity','Mod Wheel','Aftertouch','Key Pitch','Key Gate','Osc 1 Tune','Osc 1 Level','Osc 2 Tune','Osc 2 Level','Osc 3 Tune','Osc 3 Level','Noise','Filter 1 Cutoff','Filter 1 Res','Filter 2 Cutoff','Filter 2 Res','Filter Spacing','LFO 1','LFO 1 Fade In','LFO 2','LFO 2 Fade In','Filter Env','Amp Env','CV 1 IN','GATE 1 IN','CV 2 IN','GATE 2 IN','Accent','Gate','Tie']
 MATRIX_DESTINATIONS=['OFF','Osc 1 Tune','Osc 1 Wave','Osc 1 Level','Osc 2 Tune','Osc 2 Wave','Osc 2 Level','Osc 2 FM Amount','Osc 3 Tune','Osc 3 Wave','Osc 3 Level','Osc 3 FM Amount','Noise level','Filter 1 Cutoff','Filter 1 Res','Filter 2 Cutoff','Filter 2 Res','Filter Spacing','LFO 1 Wave','LFO 1 Rate','LFO 2 Wave','LFO 2 Rate','Filter 1 Env Amount','Filter 2 Env Amount','Amp Env Amount','Drive Amount','Delay Amount','Reverb Amount','Mod Amount','CV OUT 1','GATE OUT 1','CV OUT 2','GATE OUT 2','Accent Amount']+[f'Mod {i} Amount' for i in range(1,17)]
@@ -1089,11 +1089,12 @@ class App(tk.Tk):
  def store_locked(self):self._notify('STORE','Permanent preset write is intentionally locked until the 0x28 bulk-write format is fully validated on hardware.')
  def draw_synth(self):
   bottom=982
+  (lx,lw),(mid_x,mid_w),(fx_x,fx_w)=synth_columns(self.layout_w)
   # v1.31 SYNTH geometry refinement based on the v1.30 runtime layout preview.
   # Visual controls/behaviour come from the real v1.29 code. FX and MOD MATRIX below are retained verbatim.
 
   # ---- OSCILLATOR GROUP: OSC1/NOISE over OSC2/OSC3 ----
-  lx,ly,lw=10,60,610;gap=8;cell_w=(lw-gap)/2;osc_bottom=525;row_gap=10
+  ly=60;gap=8;cell_w=(lw-gap)/2;osc_bottom=525;row_gap=10
   cell_h=(osc_bottom-ly-row_gap)/2;inner_y=(cell_h-170)/2
   def osc_cell(x,y,w,h,n):
    self.rect(x,y,w,h);self.text(x+10,y+8,f'OSC {n}',12,TEXT,bold=True)
@@ -1125,11 +1126,11 @@ class App(tk.Tk):
   osc_cell(lx+cell_w+gap,lower_y,cell_w,cell_h,3)
 
   # ---- FILTER: same full parameter set, new compact placement ----
-  fx,fy,fw,fh=630,60,618,265
+  fx,fy,fw,fh=mid_x,60,mid_w,265
   self.rect(fx,fy,fw,fh);self.text(fx+fw/2,68,'FILTER',16,TEXT,'n',True)
-  screen_x,screen_y,screen_w,screen_h=834,98,210,126
+  screen_x,screen_y,screen_w,screen_h=fx+(fw-210)/2,98,210,126
   self.graph(screen_x,screen_y,screen_w,screen_h,'filter')
-  left_lines=(658,700,742,784);right_lines=(1092,1134,1176,1218)
+  left_lines=tuple(fx+offset for offset in (28,70,112,154));right_lines=tuple(fx+fw-offset for offset in (156,114,72,30))
   left_spec=[('CUT','F1_CUTOFF',0,127,False),('RES','F1_RES',0,127,False),('ENV','F1_ENV',-63,64,True),('KEY','F1_TRACK',-200,200,True)]
   right_spec=[('CUT','F2_CUTOFF',0,127,False),('RES','F2_RES',0,127,False),('ENV','F2_ENV',-63,64,True),('KEY','F2_TRACK',-200,200,True)]
   filter_fader_y=fy+34;filter_fader_h=168
@@ -1146,8 +1147,8 @@ class App(tk.Tk):
   self.button(screen_x+bw+bgap,ctrl_y,bw,ctrl_h,'CUT+RES',self.filter_link==127,lambda:self.set_filter_link(127),size=9)
 
   # ---- LFO 1 / LFO 2: two framed blocks side by side ----
-  lfy=335;lfh=190;lfw=(618-gap)/2
-  for n,x in ((1,630),(2,630+lfw+gap)):
+  lfy=335;lfh=190;lfw=(mid_w-gap)/2
+  for n,x in ((1,mid_x),(2,mid_x+lfw+gap)):
    self.rect(x,lfy,lfw,lfh);self.text(x+10,lfy+8,f'LFO {n}',12,TEXT,'nw',True)
    gx,gy,gw,gh=x+10,lfy+36,142,86
    self.graph(gx,gy,gw,gh,'lfo',f'LFO{n}_WAVE');self.hitbox(gx,gy,gw,gh,'lfo_wave',f'LFO{n}_WAVE',(0,127))
@@ -1164,9 +1165,10 @@ class App(tk.Tk):
   # The oscillator group ends at y=525, leaving an exact 10 px gap above this row.
   env_y=535;env_h=245;env_bottom=env_y+env_h
   env_gap=10
-  f_x,f_w=10,500
-  a_x,a_w=f_x+f_w+env_gap,500
-  v_x,v_w=a_x+a_w+env_gap,218
+  main_right=mid_x+mid_w;v_w=218
+  f_x=lx;f_w=(main_right-lx-v_w-env_gap*2)/2
+  a_x,a_w=f_x+f_w+env_gap,f_w
+  v_x=main_right-v_w
   env_btn_y=env_bottom-10-28;env_btn_w=70;env_btn_h=28;env_btn_gap=8
   env_slider_y=env_y+28
   env_slider_bottom=env_btn_y-10;env_slider_h=env_slider_bottom-env_slider_y
@@ -1174,7 +1176,7 @@ class App(tk.Tk):
   # FILTER ENV — same controls, compact horizontal placement.
   self.rect(f_x,env_y,f_w,env_h);self.text(f_x+f_w-10,env_y+10,'FILTER ENV',14,TEXT,'ne',True)
   f_slider_x=f_x+25;f_step=43
-  f_graph_x,f_graph_y,f_graph_w,f_graph_h=f_x+205,572,275,135
+  f_graph_x,f_graph_y,f_graph_w,f_graph_h=f_x+f_w-295,572,275,135
   f_pair_w=env_btn_w*2+env_btn_gap;f_fader_center=((f_slider_x+6)+(f_slider_x+3*f_step+6))/2;f_btn_x=f_fader_center-f_pair_w/2
   for j,k in enumerate('ADSR'):self.slider(f_slider_x+j*f_step,env_slider_y,env_slider_h,k,'FENV_'+k,vertical=True)
   self.env_graph(f_graph_x,f_graph_y,f_graph_w,f_graph_h,'FENV');self.button(f_btn_x,env_btn_y,env_btn_w,env_btn_h,'LOOP',self.toggle['FENV_LOOP'],lambda:self.toggle_param('FENV_LOOP'),size=9);self.button(f_btn_x+env_btn_w+env_btn_gap,env_btn_y,env_btn_w,env_btn_h,'RETRIG',self.toggle['FENV_RETRIG'],lambda:self.toggle_param('FENV_RETRIG'),size=9)
@@ -1182,7 +1184,7 @@ class App(tk.Tk):
   # AMP ENV — mirrored compact placement.
   self.rect(a_x,env_y,a_w,env_h);self.text(a_x+10,env_y+10,'AMP ENV',14,TEXT,'nw',True)
   a_graph_x,a_graph_y,a_graph_w,a_graph_h=a_x+20,572,275,135
-  a_slider_x=a_x+320;a_step=43
+  a_slider_x=a_x+a_w-180;a_step=43
   a_pair_w=env_btn_w*2+env_btn_gap;a_fader_center=((a_slider_x+6)+(a_slider_x+3*a_step+6))/2;a_btn_x=a_fader_center-a_pair_w/2
   self.env_graph(a_graph_x,a_graph_y,a_graph_w,a_graph_h,'AENV');self.button(a_btn_x,env_btn_y,env_btn_w,env_btn_h,'LOOP',self.toggle['AENV_LOOP'],lambda:self.toggle_param('AENV_LOOP'),size=9);self.button(a_btn_x+env_btn_w+env_btn_gap,env_btn_y,env_btn_w,env_btn_h,'RETRIG',self.toggle['AENV_RETRIG'],lambda:self.toggle_param('AENV_RETRIG'),size=9)
   for j,k in enumerate('ADSR'):self.slider(a_slider_x+j*a_step,env_slider_y,env_slider_h,k,'AENV_'+k,vertical=True)
@@ -1195,13 +1197,13 @@ class App(tk.Tk):
   for j,lab in enumerate(['MONO','LEGATO','PARA']):self.button(voice_btn_x,env_y+52+j*48,voice_btn_w,voice_btn_h,lab,self.choice['VOICE']==j,lambda j=j:self.set_choice('VOICE',j),size=9)
 
   # ---- FX — v1.45 cumulative GUI + hardware-mode fixes ----
-  fx_x,fx_w=1260,330;ix=1278;inner=294;col=137;gap=12;rx=ix+col+gap
+  inner=294;ix=fx_x+(fx_w-inner)/2;col=137;gap=12;rx=ix+col+gap
   short_inner=inner*(2/3);short_inner_x=ix+(inner-short_inner)/2
   # DRIVE — unchanged controls; compact height retained.
   drive_y,drive_h=60,112
   self.rect(fx_x,drive_y,fx_w,drive_h);self.text(ix,drive_y+10,'DRIVE',11,bold=True)
   self.slider(short_inner_x,drive_y+48,short_inner,'DRIVE','DRIVE')
-  self.text(ix,drive_y+84,'AUDIO IN',9,MUTED);self.button(1356,drive_y+72,94,28,'PRE FX',self.choice.get('AUDIO_IN',0)==0,lambda:self.set_choice('AUDIO_IN',0),size=9);self.button(1456,drive_y+72,116,28,'POST FX',self.choice.get('AUDIO_IN',0)==1,lambda:self.set_choice('AUDIO_IN',1),size=9)
+  self.text(ix,drive_y+84,'AUDIO IN',9,MUTED);self.button(ix+78,drive_y+72,94,28,'PRE FX',self.choice.get('AUDIO_IN',0)==0,lambda:self.set_choice('AUDIO_IN',0),size=9);self.button(ix+178,drive_y+72,116,28,'POST FX',self.choice.get('AUDIO_IN',1),lambda:self.set_choice('AUDIO_IN',1),size=9)
 
   # MODULATION — top-level type is strictly 3 states; lower FX blocks can never be hidden by an invalid RX value.
   mod_y,mod_h=drive_y+drive_h+10,230
@@ -1254,11 +1256,14 @@ class App(tk.Tk):
   self.slider(short_inner_x,rev_y+rev_h-68,short_inner,'AMOUNT','REV_AMOUNT')
 
   # MOD MATRIX — v1.29, intentionally unchanged.
-  my=790;mh=192;self.rect(10,my,1238,mh);self.text(24,my+10,'MOD MATRIX — 16 ROUTES',14,bold=True);self.text(90,my+38,'SOURCE',9,MUTED);self.text(420,my+38,'AMOUNT',9,MUTED);self.text(650,my+38,'DESTINATION',9,MUTED);self.text(1030,my+38,'FADE IN',9,MUTED)
+  my=790;mh=192;matrix_x=lx;matrix_w=main_right-lx;mxscale=matrix_w/1238
+  mx=lambda offset:matrix_x+offset*mxscale
+  mw=lambda width:width*mxscale
+  self.rect(matrix_x,my,matrix_w,mh);self.text(mx(14),my+10,'MOD MATRIX — 16 ROUTES',14,bold=True);self.text(mx(80),my+38,'SOURCE',9,MUTED);self.text(mx(410),my+38,'AMOUNT',9,MUTED);self.text(mx(640),my+38,'DESTINATION',9,MUTED);self.text(mx(1020),my+38,'FADE IN',9,MUTED)
   rowh=30;ctrlh=22;startrow=max(0,min(12,self.matrix_scroll))
   for vis,i in enumerate(range(startrow,startrow+4)):
-   yy=my+56+vis*rowh;self.text(27,yy+ctrlh/2,f'{i+1:02}',8,MUTED,'w');self.dropdown(70,yy,250,ctrlh,self.values.get(f'MSRC{i}','SOURCE'),f'MSRC{i}',MATRIX_SOURCES);src=self.values.get(f'MSRC{i}','SOURCE');bi=self._matrix_source_bipolar(src);self.slider(350,yy+ctrlh/2-4,220,'',f'MAMT{i}',-64 if bi else 0,64,bi,show_label=False);self.dropdown(600,yy,315,ctrlh,self.values.get(f'MDST{i}','DESTINATION'),f'MDST{i}',MATRIX_DESTINATIONS);self.slider(945,yy+ctrlh/2-4,260,'',f'MFADE{i}',0,127,False,show_label=False)
-  track_y=my+56;track_h=rowh*4;self.line(1228,track_y,1228,track_y+track_h,EDGE,3);thumb_h=track_h*4/16;thumb_y=track_y+(track_h-thumb_h)*(startrow/12 if 12 else 0);self.line(1228,thumb_y,1228,thumb_y+thumb_h,ORANGE,4)
+   yy=my+56+vis*rowh;self.text(mx(17),yy+ctrlh/2,f'{i+1:02}',8,MUTED,'w');self.dropdown(mx(60),yy,mw(250),ctrlh,self.values.get(f'MSRC{i}','SOURCE'),f'MSRC{i}',MATRIX_SOURCES);src=self.values.get(f'MSRC{i}','SOURCE');bi=self._matrix_source_bipolar(src);self.slider(mx(340),yy+ctrlh/2-4,mw(220),'',f'MAMT{i}',-64 if bi else 0,64,bi,show_label=False);self.dropdown(mx(590),yy,mw(315),ctrlh,self.values.get(f'MDST{i}','DESTINATION'),f'MDST{i}',MATRIX_DESTINATIONS);self.slider(mx(935),yy+ctrlh/2-4,mw(260),'',f'MFADE{i}',0,127,False,show_label=False)
+  track_y=my+56;track_h=rowh*4;track_x=matrix_x+matrix_w-20;self.line(track_x,track_y,track_x,track_y+track_h,EDGE,3);thumb_h=track_h*4/16;thumb_y=track_y+(track_h-thumb_h)*(startrow/12 if 12 else 0);self.line(track_x,thumb_y,track_x,thumb_y+thumb_h,ORANGE,4)
 
  def _matrix_source_bipolar(self,source):
   # Source polarity is a UI property; unknown/ambiguous hardware inputs keep the legacy bipolar presentation.

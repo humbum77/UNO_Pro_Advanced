@@ -1,6 +1,6 @@
 import unittest
 
-from ui_layout import Viewport, split_columns, three_columns
+from ui_layout import Viewport, split_columns, synth_columns, three_columns
 
 
 class ResponsiveViewportTests(unittest.TestCase):
@@ -28,6 +28,15 @@ class ResponsiveViewportTests(unittest.TestCase):
         columns = split_columns(1777.777777, (3, 2), margin=24, gap=28)
         self.assertAlmostEqual(columns[-1][0] + columns[-1][1], 1777.777777 - 24)
         self.assertAlmostEqual(columns[0][1] / columns[1][1], 1.5)
+
+    def test_synth_preserves_base_geometry_and_fills_wide_viewport(self):
+        base = synth_columns(1600)
+        self.assertEqual(base, ((10.0, 610.0), (630.0, 618.0), (1260.0, 330.0)))
+        wide = synth_columns(1777.777777)
+        self.assertGreater(wide[0][1], base[0][1])
+        self.assertGreater(wide[1][1], base[1][1])
+        self.assertGreater(wide[2][1], base[2][1])
+        self.assertAlmostEqual(wide[2][0] + wide[2][1], 1777.777777 - 10)
 
 
 if __name__ == '__main__':

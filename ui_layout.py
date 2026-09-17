@@ -55,3 +55,16 @@ def split_columns(total_width, fractions, margin=16.0, gap=14.0):
         result.append((x, width))
         x += width + gap
     return result
+
+
+def synth_columns(total_width):
+    """Responsive SYNTH zones preserving the original 1600px composition."""
+    total = max(MIN_LOGICAL_WIDTH, float(total_width))
+    extra = total - MIN_LOGICAL_WIDTH
+    left_width = 610.0 + extra * (610.0 / 1558.0)
+    middle_width = 618.0 + extra * (618.0 / 1558.0)
+    left_x = 10.0
+    middle_x = left_x + left_width + 10.0
+    right_x = middle_x + middle_width + 12.0
+    right_width = max(330.0, total - right_x - 10.0)
+    return (left_x, left_width), (middle_x, middle_width), (right_x, right_width)
