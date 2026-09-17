@@ -1,8 +1,9 @@
-# UNO Pro Advanced v0.9.6-beta
+# UNO Pro Advanced v0.9.7-beta
 
 Интеграция main v0.9.5-beta и Live Creator v0.6-alpha: встроенная страница LIVE, LENGTH, скруглённые блоки, Dupl, parameter Automation, read-only native reader и общие Dark/Light темы.
-Актуальный [отчёт с проверками и ограничениями](Docs/INTEGRATION_v0.9.6-beta.md), [changelog](CHANGELOG.md).
+Актуальные [примечания к релизу](Docs/RELEASE_NOTES_v0.9.7-beta.md), [состояние проекта](Docs/PROJECT_STATE.md), [решения](Docs/DECISIONS.md) и [changelog](CHANGELOG.md).
 Служебное хранилище: `%LOCALAPPDATA%\UnoLive`. Пользовательские presets не переносятся.
+В v0.9.7-beta добавлен единый декодер секвенсора для локальных `.unosyp` и аппаратного SysEx `0x29` с подтверждённым чтением Gate, Accent и TIE. Утверждённая новая анимация огибающей и геометрия S–R защищены полным запретом на изменения без прямого указания пользователя.
 Это source standalone для Python/Tkinter/Pillow, не автономный EXE. Native automation writer/mapping остаются PARTIAL; Live playback без MIDI/звука. Hardware PASS не заявляется.
 
 ## Сохранённое поведение основной программы

@@ -4,19 +4,40 @@ import ui_theme
 from live_creator.ui.theme import *
 
 class Button(tk.Canvas):
+    """Shared pad-like button surface used by LIVE transport controls."""
     def __init__(self,parent,text,command,width=72,height=30):
-        super().__init__(parent,width=width,height=height,bg=PANEL2,highlightthickness=1,highlightbackground=EDGE)
+        super().__init__(parent,width=width,height=height,bg=PANEL,highlightthickness=0)
         self.text=text;self.command=command;self.active=False
-        self.bind('<Configure>',lambda e:self.draw())
-        self.bind('<Enter>',lambda e:self.configure(highlightbackground=ORANGE))
-        self.bind('<Leave>',lambda e:self.configure(highlightbackground=EDGE))
-        self.bind('<Button-1>',lambda e:command())
-        self.bind('<Return>',lambda e:command());self.configure(takefocus=True)
+        self.bind('<Configure>',lambda e:self.draw());self.bind('<Button-1>',lambda e:command());self.bind('<Return>',lambda e:command());self.configure(takefocus=True)
+    def _round(self,x1,y1,x2,y2,r,**kw):
+        pts=(x1+r,y1,x2-r,y1,x2,y1,x2,y1+r,x2,y2-r,x2,y2,x2-r,y2,x1+r,y2,x1,y2,x1,y2-r,x1,y1+r,x1,y1)
+        return self.create_polygon(*pts,smooth=True,splinesteps=20,**kw)
+    @staticmethod
+    def _shade(color,f):
+        c=color.lstrip('#');v=[int(c[i:i+2],16) for i in (0,2,4)];return '#'+''.join(f'{max(0,min(255,round(n*f))):02x}' for n in v)
     def draw(self):
-        transport=ui_theme.TOKENS[ui_theme.current]['play'] if self.text.startswith(('PLAY','STOP')) else None
-        self.delete('all');self.configure(bg=transport if transport and self.active else (ORANGE2 if self.active else PANEL2))
-        self.create_text(self.winfo_width()/2,self.winfo_height()/2,text=self.text,fill='#101417' if transport and self.active else (transport or TEXT),font=('Segoe UI',10))
+        self.delete('all');w=max(2,self.winfo_width()-1);h=max(2,self.winfo_height()-1);base=PANEL2
+        # Very slight pad volume: edges lighter, centre darker.
+        for i in range(7):
+            q=i/6;ins=1+q*min(w,h)*.12;self._round(ins,ins,w-ins,h-ins,max(3,7-ins/3),fill=self._shade(base,1.045-.105*q),outline='')
+        transport=self.text.startswith(('PLAY','STOP'));edge=ui_theme.TOKENS['dark']['play'] if transport else (LIGHT_GREY if self.active else EDGE)
+        if transport and self.active and int(__import__('time').monotonic()*3)%2:edge=self._shade(edge,.55)
+        self._round(1,1,w-1,h-1,7,fill='',outline=edge,width=2 if transport else 1)
+        self.create_text(w/2,h/2,text=self.text,fill=TEXT,font=('Segoe UI',10,'bold' if transport else 'normal'))
     def set(self,text,active=False):self.text=text;self.active=active;self.draw()
+
+
+class TransportButton(Button):
+    """LIVE transport rendered with the Sequencer PLAY surface recipe only."""
+    def draw(self):
+        self.delete('all');w=max(2,self.winfo_width()-1);h=max(2,self.winfo_height()-1);base=PANEL2
+        # Same 8-layer volume recipe and radius as the main Sequencer pad_surface.
+        for i in range(8):
+            q=i/7;ins=1+q*min(w,h)*.12;self._round(ins,ins,w-ins,h-ins,max(3,7-ins/3),fill=self._shade(base,1.045-.105*q),outline='')
+        edge=ui_theme.TOKENS['dark']['play']
+        if self.active and int(__import__('time').monotonic()*3)%2:edge=self._shade(edge,.55)
+        self._round(1,1,w-1,h-1,7,fill='',outline=edge,width=2 if self.active else 1)
+        self.create_text(w/2,h/2,text=self.text,fill=TEXT,font=('Segoe UI',11,'bold'))
 
 class Scrollbar(tk.Canvas):
     def __init__(self,parent,command,horizontal=False):
@@ -30,7 +51,7 @@ class Scrollbar(tk.Canvas):
         def line(a,b,color,width):
             self.create_line(*((a,7,b,7) if self.horizontal else (7,a,7,b)),fill=color,width=width)
         line(8,length+8,EDGE,3)
-        if self.last-self.first<.999:line(8+length*self.first,8+length*self.last,ORANGE,5)
+        if self.last-self.first<.999:line(8+length*self.first,8+length*self.last,'#c9ced1',5)
     def move(self,e):
         length=max(1,(self.winfo_width() if self.horizontal else self.winfo_height())-16)
         v=((e.x if self.horizontal else e.y)-8)/length-(self.last-self.first)/2

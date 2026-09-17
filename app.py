@@ -24,34 +24,58 @@ MATRIX_DESTINATIONS=['OFF','Osc 1 Tune','Osc 1 Wave','Osc 1 Level','Osc 2 Tune',
 
 BG='#101417'; PANEL='#1b2024'; PANEL2='#22282d'; EDGE='#3b444a'; TEXT='#e7e9ea'; MUTED='#8e989f'; LIGHT_GREY='#c9ced1'; ORANGE='#ff8c18'; ORANGE2='#8a4b12'; BLUE='#4db8ff'; GREEN='#8ecb18'; RED='#d83a3a'; WHITE='#f5f5f5'
 BASE_W,BASE_H=1600,1000
+ENV_FRAME_SEC=0.033
+ENV_SHORT_STAGE_SEC=ENV_FRAME_SEC*2
+ENV_PULSE_SEC=0.100
+ENV_ANIM_MIN=0.200
+ENV_ANIM_MAX=3.000
+ENV_MIN_VISIBLE_SEC=ENV_ANIM_MIN
+ENV_TIME_CURVE=0.6
 logger=logging.getLogger(__name__)
 
 def clamp(v,a,b):return max(a,min(b,v))
 
 class App(tk.Tk):
  def __init__(self):
-  super().__init__(); self.title('UNO Pro Advanced v0.9.6-beta'); self.configure(bg=BG)
-  sw,sh=self.winfo_screenwidth(),self.winfo_screenheight(); w,h=1440,900; self.geometry(f'{w}x{h}+{max(0,(sw-w)//2)}+{max(0,(sh-h)//2)}'); self.resizable(False,False)
+  super().__init__(); self.title('UNO Pro Advanced v0.9.7-beta'); self.configure(bg=BG)
+  sw,sh=self.winfo_screenwidth(),self.winfo_screenheight()
+  # Historical 100% window size; free resizing remains enabled.
+  w,h=1200,750
+  self.geometry(f'{w}x{h}+{max(0,(sw-w)//2)}+{max(0,(sh-h)//2)}')
+  self.minsize(1000,640)
+  self.resizable(True,True)
   self.canvas=tk.Canvas(self,bg=BG,highlightthickness=0);self.canvas.pack(fill='both',expand=True)
-  self.settings=storage.load_settings();self.settings.setdefault('ui_scale','100%');self.settings.setdefault('pitch_bend_range',2);self.settings['midi_clock']='MIDI MASTER' if self.settings.get('midi_clock')=='MIDI' else ('Off' if self.settings.get('midi_clock') not in ('Off','MIDI MASTER') else self.settings.get('midi_clock'));self.settings_dirty=False;self._applied_settings=copy.deepcopy(self.settings);self.keyboard_visible=bool(self.settings.get('keyboard_visible',False));self.keyboard_octave_shift=0;self._clock_master_job=None;self.page='SYNTH';self._apply_ui_scale(self.settings.get('ui_scale','100%'),save=False)
+  self._resize_job=None
+  self.settings=storage.load_settings();# ui_scale is kept only for backward-compatible settings.json; the value is ignored.
+  self.settings.setdefault('ui_scale','100%');self.settings.setdefault('pitch_bend_range',2);self.settings['midi_clock']='MIDI MASTER' if self.settings.get('midi_clock')=='MIDI' else ('Off' if self.settings.get('midi_clock') not in ('Off','MIDI MASTER') else self.settings.get('midi_clock'));self.settings_dirty=False;self._applied_settings=copy.deepcopy(self.settings);self.keyboard_visible=bool(self.settings.get('keyboard_visible',False));self.keyboard_octave_shift=0;self._clock_master_job=None;self.page='SYNTH'
   self.song_mode='SONG';self.preset=Preset();self.song=Song();self.selected_song_file=None
-  self.live_editor=None;self.automation_parameter='CUTOFF 1';ui_theme.set_theme(self.settings.get('theme','dark'))
+  self.live_editor=None;self.automation_parameter='CUTOFF 1';ui_theme.set_theme('dark')
   self.configure(bg=ui_theme.color(BG));self.canvas.configure(bg=ui_theme.color(BG))
-  self.scale=1;self.ox=0;self.oy=0;self.hit=[];self.drag=None;self.popup=None;self.status='OFFLINE';self._closing=False;self._graph_images=[];self.selected_seq_step=0;self.selected_seq_note=None;self.seq_visible=16;self.seq_hscroll=0;self.seq_note_low=36;self.seq_param='GATE';self.seq_mod=0;self.seq_overdub='MONO';self.seq_resolution='1/16';self.seq_timing='STRAIGHT';self.seq_swing=0;self.seq_clipboard=None;self.selected_song_slot=0;self.selected_live_slot=0;self.song_preset_folder=storage.PRESETS;self.song_folder_scroll=0;self.live_slots=(list(self.settings.get('live_slots',[]))[:64]+[None]*64)[:64];self.lib_category='All';self.lib_query='';self.lib_selected=None;self.hardware_selected=1;self.preview=True;self.preset_source='HARDWARE';self.preset_folder=None;self.lib_panel_source=['LOCAL','UNO'];self.lib_panel_folder=[storage.PRESETS,None];self.lib_scroll=[0,0];self.lib_hscroll=[0,0];self.lib_expanded=set();self.lib_star_filter=False;self.lib_color_filters=set();self.lib_right_mode='UNO';self.lib_right_folder=None;self._lib_folder_entry=None;self._lib_folder_entry_window=None;self._lib_tooltip_job=None;self._lib_tooltip=None;self._mod_tooltip_job=None;self._mod_tooltip=None;self.keys_down=set();self.hw_keys_down=set();self.pitch_visual=0;self.open_dropdown=None;self.dropdown_scroll=0;self.dropdown_hover=None;self._lib_search_entry=None;self._lib_clipboard=None;self._lib_folder_clipboard=None;self._lib_drag_origin=None;self._lib_drag_started=False;self._lib_drag_pos=None;self.lib_focus=0;self.lib_hw_selected=1;self._seq_fill_flash=False;self.song_tree_expanded={str(storage.PRESETS)};self.song_tree_selected=storage.PRESETS;self.matrix_scroll=0;self.seq_playing=False;self.seq_recording=False;self.seq_record_step=0;self._seq_clock_count=0;self.arp_on=False;self._seq_active_notes=set();self._seq_noteoff_jobs={};self._seq_last_clock_time=None;self._seq_clock_interval=0.020833;self._rx_bank=0;self.hardware_names={};self._catalog_slot=0;self._catalog_active=False;self._catalog_job=None;self._catalog_timeout_job=None;self._catalog_retry=0;self._hw_refresh_job=None;self._hw_name_job=None;self._hw_seq_job=None;self._hw_seq_timeout_job=None;self._hw_seq_slot=None;self._hw_seq_pages={};self._hw_seq_expected_page=None;self._last_state_dump=None;self.sequence_origin='HARDWARE_STATE_ONLY';self.live_delay=int(self.settings.get('live_delay',0));self.live_playing=False;self.live_countdown_remaining=0;self._live_countdown_job=None
+  self.scale=1;self.ox=0;self.oy=0;self.hit=[];self.drag=None;self.popup=None;self.status='OFFLINE';self._closing=False;self._graph_images=[];self.selected_seq_step=0;self.selected_seq_note=None;self.seq_visible=16;self.seq_hscroll=0;self.seq_note_low=36;self.seq_param='GATE';self.seq_mod=0;self.seq_overdub='MONO';self.seq_resolution='1/16';self.seq_timing='STRAIGHT';self.seq_swing=0;self.seq_clipboard=None;self.selected_song_slot=0;self.selected_live_slot=0;self.song_preset_folder=storage.PRESETS;self.song_folder_scroll=0;self.live_slots=(list(self.settings.get('live_slots',[]))[:64]+[None]*64)[:64];self.lib_category='All';self.lib_query='';self.lib_selected=None;self.hardware_selected=1;self.preview=True;self.preset_source='HARDWARE';self.preset_folder=None;self.lib_panel_source=['LOCAL','UNO'];self.lib_panel_folder=[storage.PRESETS,None];self.lib_scroll=[0,0];self.lib_hscroll=[0,0];self.lib_expanded=set();self.lib_star_filter=False;self.lib_color_filters=set();self.lib_right_mode='UNO';self.lib_right_folder=None;self._lib_folder_entry=None;self._lib_folder_entry_window=None;self._lib_tooltip_job=None;self._lib_tooltip=None;self._mod_tooltip_job=None;self._mod_tooltip=None;self.keys_down=set();self.hw_keys_down=set();self.pitch_visual=0;self.open_dropdown=None;self.dropdown_scroll=0;self.dropdown_hover=None;self._lib_search_entry=None;self._lib_clipboard=None;self._lib_folder_clipboard=None;self._lib_drag_origin=None;self._lib_drag_started=False;self._lib_drag_pos=None;self.lib_focus=0;self.lib_hw_selected=1;self._seq_fill_flash=False;self.song_tree_expanded={str(storage.PRESETS)};self.song_tree_selected=storage.PRESETS;self.matrix_scroll=0;self.seq_playing=False;self.seq_recording=False;self.seq_record_step=0;self.seq_metronome=False;self.seq_count_in='OFF';self.seq_quantize='OFF';self.seq_groove='STRAIGHT';self.seq_groove_amount=0;self._seq_countin_job=None;self._seq_countin_left=0;self.transpose_mode=False;self.transpose_preview=0;self._transpose_original=0;self._transport_anim_job=None;self._seq_clock_count=0;self.arp_on=False;self._seq_active_notes=set();self._seq_noteoff_jobs={};self._seq_last_clock_time=None;self._seq_clock_interval=0.020833;self._rx_bank=0;self.hardware_names={};self._catalog_slot=0;self._catalog_active=False;self._catalog_job=None;self._catalog_timeout_job=None;self._catalog_retry=0;self._hw_refresh_job=None;self._hw_name_job=None;self._hw_seq_job=None;self._hw_seq_timeout_job=None;self._hw_seq_slot=None;self._hw_seq_pages={};self._hw_seq_expected_page=None;self._last_state_dump=None;self.sequence_origin='HARDWARE_STATE_ONLY';self.live_delay=int(self.settings.get('live_delay',0));self.live_playing=False;self.live_countdown_remaining=0;self._live_countdown_job=None
   self.values={}
   self.env_gate=False;self.env_release=False;self.env_phase_start=0.0;self.env_level_at_release=0.0;self.env_release_levels={'FENV':0.0,'AENV':0.0};self.anim_values={};self.filter_link=64;self._numeric_entry=None;self._anim_last=time.monotonic();self._anim_job=None;self._env_hover=None
   self._defaults();self.midi=MidiEngine(self._midi_rx);self._midi_inputs=[];self._midi_outputs=[];self._midi_apply_busy=False;self._midi_apply_result=queue.Queue();self._midi_ports_busy=False;self._midi_ports_result=queue.Queue();self._midi_close_result=queue.Queue();self._midi_close_deadline=0.0;self._cc_last_sent={};self._cc_pending={};self._cc_jobs={};self._cc_interval=0.008;self._midi_rx_queue=queue.Queue();self._midi_rx_job=None;self._popup_clear_job=None
-  self._aspect_adjusting=False;self._last_window_size=(w,h)
-  self.canvas.bind('<Configure>',lambda e:self.redraw());self.canvas.bind('<Button-1>',self.click);self.canvas.bind('<Button-3>',self.right_click);self.canvas.bind('<Double-Button-1>',self.double_click);self.canvas.bind('<Motion>',self.hover_motion);self.canvas.bind('<B1-Motion>',self.motion);self.canvas.bind('<ButtonRelease-1>',self.release);self.canvas.bind('<MouseWheel>',self.wheel);self.bind('<KeyPress>',self.keypress)
+  self.canvas.bind('<Configure>',self._on_canvas_configure);self.canvas.bind('<Button-1>',self.click);self.canvas.bind('<Button-3>',self.right_click);self.canvas.bind('<Double-Button-1>',self.double_click);self.canvas.bind('<Motion>',self.hover_motion);self.canvas.bind('<B1-Motion>',self.motion);self.canvas.bind('<ButtonRelease-1>',self.release);self.canvas.bind('<MouseWheel>',self.wheel);self.bind('<KeyPress>',self.keypress)
   self.protocol('WM_DELETE_WINDOW',self.close)
   # Poll the thread-safe MIDI queue at 10 ms. High-rate CC bursts are coalesced to the latest value.
   self._midi_rx_job=self.after(10,self._drain_midi_rx)
   # v1.28: restore automatic MIDI connection to saved ports at startup.
   self.after(250,self._start_port_refresh)
   self.after(30,self._restore_session_preset)
+ def _on_canvas_configure(self,event=None):
+  # Coalesce rapid resize events: redraw at most every 30 ms.
+  if self._closing:return
+  if self._resize_job is not None:
+   try:self.after_cancel(self._resize_job)
+   except Exception:pass
+  self._resize_job=self.after(30,self._resize_redraw)
+ def _resize_redraw(self):
+  self._resize_job=None
+  if not self._closing:self.redraw()
+
  def _defaults(self):
   for k in CC:self.values[k]=64
-  self.values.update({'F1_CUTOFF':127,'F1_RES':0,'F1_ENV':0,'F1_TRACK':0,'F2_CUTOFF':127,'F2_RES':0,'F2_ENV':0,'F2_TRACK':0,'OSC1_WAVE':42,'OSC2_WAVE':0,'OSC3_WAVE':0,'OSC1_TUNE':0,'OSC2_TUNE':0,'OSC3_TUNE':0,'OSC1_FINE':0,'OSC2_FINE':0,'OSC3_FINE':0,'LFO1_WAVE':0,'LFO2_WAVE':0,'OSC1_LEVEL':127,'OSC2_LEVEL':0,'OSC3_LEVEL':0,'NOISE_LEVEL':0,'GLIDE':0,'FENV_A':4,'FENV_D':20,'FENV_S':127,'FENV_R':20,'AENV_A':4,'AENV_D':20,'AENV_S':127,'AENV_R':20,'LFO1_RATE':45,'LFO2_RATE':60,'LFO1_FADE':0,'LFO2_FADE':0,'SWING':50,'FILTER_SPACING':0,'ARP_GATE':64,'SEQ_SWING':0})
+  self.values.update({'F1_CUTOFF':127,'F1_RES':0,'F1_ENV':0,'F1_TRACK':0,'F2_CUTOFF':127,'F2_RES':0,'F2_ENV':0,'F2_TRACK':0,'OSC1_WAVE':42,'OSC2_WAVE':0,'OSC3_WAVE':0,'OSC1_TUNE':0,'OSC2_TUNE':0,'OSC3_TUNE':0,'OSC1_FINE':0,'OSC2_FINE':0,'OSC3_FINE':0,'LFO1_WAVE':0,'LFO2_WAVE':0,'OSC1_LEVEL':127,'OSC2_LEVEL':0,'OSC3_LEVEL':0,'NOISE_LEVEL':0,'GLIDE':0,'FENV_A':4,'FENV_D':20,'FENV_S':127,'FENV_R':20,'AENV_A':4,'AENV_D':20,'AENV_S':127,'AENV_R':20,'LFO1_RATE':45,'LFO2_RATE':60,'LFO1_FADE':0,'LFO2_FADE':0,'SWING':50,'FILTER_SPACING':0,'ARP_GATE':64,'SEQ_SWING':0,'SEQ_GROOVE_AMOUNT':0})
   self.choice={'F1_MODE':0,'F2_MODE':0,'MOD_TYPE':0,'MOD_SUB':0,'DELAY_TYPE':3,'REVERB_TYPE':0,'VOICE':0,'LFO1_SHAPE':0,'LFO2_SHAPE':0,'ARP_MODE':0,'ARP_OCT':1,'SEQ_DIR':0,'LFO1_CURVE':0,'LFO2_CURVE':0}
   self.toggle={'SYNC2':False,'SYNC3':False,'RING':False,'FENV_LOOP':False,'FENV_RETRIG':False,'AENV_LOOP':False,'AENV_RETRIG':False,'LFO1_SYNC':False,'LFO1_RETRIG':False,'LFO2_SYNC':False,'LFO2_RETRIG':False,'ARP_HOLD':False,'DELAY_SYNC':False}
   
@@ -93,29 +117,30 @@ class App(tk.Tk):
    return
   self.status=f'MIDI PORT SCAN FAILED — {err}';self.redraw()
  def _apply_ui_scale(self,value,save=True):
-  sizes={'100%':(1200,750),'125%':(1440,900),'150%':(1600,1000)};value=str(value)
-  if value not in sizes:value='100%'
-  w,base_h=sizes[value]
-  # Keep the SYNTH/SEQ design scale unchanged when the drop-down keyboard is open.
-  # The window grows vertically by the keyboard design height instead of shrinking
-  # the entire 1600x1000 interface to fit the extra panel.
-  base_scale=min(w/BASE_W,base_h/BASE_H)
-  h=round((BASE_H+(170 if self.keyboard_visible and self.page!='SETTINGS' else 0))*base_scale)
-  sw,sh=self.winfo_screenwidth(),self.winfo_screenheight()
-  self.geometry(f'{w}x{h}+{max(0,(sw-w)//2)}+{max(0,(sh-h)//2)}');self.resizable(False,False)
-  self.settings['ui_scale']=value
-  if save:storage.save_settings(self.settings)
+  # Retained for backward-compatible call sites. The editor now uses free
+  # window resizing; the scale is derived from the actual canvas size in redraw().
   self.after_idle(self.redraw)
  def _show_scale_menu(self):
   m=self._dark_menu(self)
-  cur=str(self.settings.get('ui_scale','100%'))
-  for value in ('100%','125%','150%'):
-   m.add_command(label=('✓  ' if value==cur else '    ')+value,command=lambda v=value:self._apply_ui_scale(v,save=True))
-  # Anchor the popup to the actual scaled canvas position of the ⛶ button.
+  m.add_command(label='FIT TO SCREEN',command=self._fit_to_screen)
+  m.add_command(label='RESET 100%',command=self._reset_window_size)
   px=self.winfo_rootx()+int(self.X(1496))
   py=self.winfo_rooty()+int(self.Y(8+34))+2
   try:m.tk_popup(px,py)
   finally:m.grab_release()
+ def _fit_to_screen(self):
+  sw,sh=self.winfo_screenwidth(),self.winfo_screenheight()
+  design_h=self._design_height()
+  # Uniform fit leaving a 60 px horizontal and 80 px vertical margin.
+  s=min((sw-60)/BASE_W,(sh-80)/design_h)
+  w,h=round(BASE_W*s),round(design_h*s)
+  self.geometry(f'{w}x{h}+{max(0,(sw-w)//2)}+{max(0,(sh-h)//2)}')
+  self.after_idle(self.redraw)
+ def _reset_window_size(self):
+  w,h=1200,750
+  sw,sh=self.winfo_screenwidth(),self.winfo_screenheight()
+  self.geometry(f'{w}x{h}+{max(0,(sw-w)//2)}+{max(0,(sh-h)//2)}')
+  self.after_idle(self.redraw)
  def _mod_routes_for_dest(self,dest):
   out=[]
   for i in range(16):
@@ -140,7 +165,6 @@ class App(tk.Tk):
   self.settings[key]=value
   if key=='preview':self.preview=bool(value)
   if key=='pr_change':self.settings[key]=True
-  if key=='ui_scale':self._apply_ui_scale(value,save=False)
   storage.save_settings(self.settings);self.settings_dirty=False
   if key in ('midi_in','midi_out','midi_in_channel','midi_out_channel','midi_controller'):
    self.status='APPLYING MIDI…';self.redraw();self._start_midi_connect(save=True,initial=False)
@@ -245,7 +269,7 @@ class App(tk.Tk):
   if page<4:
    self._request_hardware_sequence_page(page+1);return True
   try:
-   apply_to_sequence(self.preset.sequence,{p:self._hw_seq_pages[p] for p in range(1,5)})
+   apply_to_sequence(self.preset.sequence,{p:self._hw_seq_pages[p] for p in range(0,5)})
    self._autofit_sequence_note_view()
    self.sequence_origin='HARDWARE_0x29'
    self.status=f'HARDWARE {self.hardware_selected:03d} — 64-step sequence read'
@@ -266,12 +290,6 @@ class App(tk.Tk):
  def _design_height(self):
   # Keyboard is part of the layout, never an overlay: opening it extends the design area.
   return BASE_H+(170 if self.keyboard_visible and self.page!='SETTINGS' else 0)
- def _on_window_configure(self,e):
-  # Kept as a no-op for compatibility; forced geometry correction caused resize jitter.
-  return
- def _clear_aspect_adjusting(self):
-  self._aspect_adjusting=False
-
  def _restore_session_preset(self):
   """Restore editor selection/state only; never transmit MIDI during startup restore."""
   try:
@@ -368,9 +386,40 @@ class App(tk.Tk):
    r=diameter/2;self.canvas.create_oval(self.X(cx-r),self.Y(cy-r),self.X(cx+r),self.Y(cy+r),fill=color,outline=outline or '')
  def line(self,x1,y1,x2,y2,fill=EDGE,width=1):self.canvas.create_line(self.X(x1),self.Y(y1),self.X(x2),self.Y(y2),fill=ui_theme.color(fill),width=self.S(width))
  def hitbox(self,x,y,w,h,kind,key=None,data=None):self.hit.append((x,y,w,h,kind,key,data))
+ def _mix_hex(self,color,factor):
+  c=ui_theme.color(color).lstrip('#');rgb=[int(c[i:i+2],16) for i in (0,2,4)];rgb=[max(0,min(255,round(v*factor))) for v in rgb];return '#'+''.join(f'{v:02x}' for v in rgb)
+ def pad_surface(self,x,y,w,h,base=PANEL2,outline=EDGE,outline_width=1,r=7):
+  # Shared LIVE/Sequencer pad renderer: subtly lighter edges, slightly darker centre.
+  if PIL_OK:
+   try:
+    sc=max(.5,float(self.scale));tw=max(4,int(round(w*sc)));th=max(4,int(round(h*sc)));ss=2
+    W,H=tw*ss,th*ss;basec=ui_theme.color(base).lstrip('#');br=[int(basec[i:i+2],16) for i in (0,2,4)]
+    img=Image.new('RGBA',(W,H),(0,0,0,0));dr=ImageDraw.Draw(img);radius=max(2,int(r*sc*ss))
+    # Eight very small luminance steps read as volume, not as a glossy bevel.
+    layers=8;max_in=max(2,int(min(W,H)*.12))
+    for i in range(layers):
+     q=i/max(1,layers-1);ins=round(q*max_in);f=1.045-(.105*q)
+     fc=tuple(max(0,min(255,round(v*f))) for v in br)+(255,)
+     dr.rounded_rectangle((ins,ins,W-1-ins,H-1-ins),radius=max(1,radius-ins//2),fill=fc)
+    oc=ui_theme.color(outline);ow=max(1,int(outline_width*sc*ss));dr.rounded_rectangle((ow//2,ow//2,W-1-ow//2,H-1-ow//2),radius=radius,outline=oc,width=ow)
+    img=img.resize((tw,th),Image.Resampling.LANCZOS);ph=ImageTk.PhotoImage(img);self._graph_images.append(ph);self.canvas.create_image(self.X(x),self.Y(y),image=ph,anchor='nw');return
+   except Exception:pass
+  self.rect(x,y,w,h,base,outline,outline_width,r)
+ def _transport_anim_tick(self):
+  self._transport_anim_job=None
+  if self.seq_playing or self.seq_recording or self.live_playing or self.arp_on or self.toggle.get('ARP_HOLD',False):self.redraw()
+ def transport_button(self,x,y,w,h,label,color,active,action,size=11):
+  # PLAY/REC pulse; ARP ON/HOLD are independent steady status lights.
+  up=label.upper().replace('▶','').replace('●','').strip();animated=('PLAY' in up or up.startswith('STOP') or 'REC' in up)
+  if active and animated and self._transport_anim_job is None:self._transport_anim_job=self.after(260,self._transport_anim_tick)
+  pulse=active and animated and int(time.monotonic()*3)%2==0;edge=color if (not active or not animated or pulse) else self._mix_hex(color,.55)
+  self.pad_surface(x,y,w,h,PANEL2,edge,2 if active else 1,7);self.text(x+w/2,y+h/2,label,size,TEXT,'center',True);self.hitbox(x,y,w,h,'action',None,action)
  def button(self,x,y,w,h,label,active=False,action=None,key=None,size=11):
-  transport=ui_theme.TOKENS[ui_theme.current]['play' if label.startswith(('PLAY','STOP')) else 'rec'] if label.startswith(('PLAY','STOP','REC')) else None
-  self.rect(x,y,w,h,transport if transport and active else (ORANGE2 if active else PANEL2),transport or (ORANGE if active else EDGE));self.text(x+w/2,y+h/2,label,size,MUTED if label=='Dupl' and action is None else ('#101418' if transport and active else (transport or (ORANGE if active else TEXT))),'center',True);self.hitbox(x,y,w,h,'action',key,action)
+  up=label.upper().replace('▶','').replace('■','').strip();is_play=('PLAY' in up or up.startswith('STOP'));is_rec=('REC' in up)
+  if is_play or is_rec:return self.transport_button(x,y,w,h,label,GREEN if is_play else RED,active,action,size)
+  if label=='ON' and self.page=='ARP + SEQUENCER':fill=('#24422a' if active else PANEL2);edge=(GREEN if active else EDGE);txt=(GREEN if active else TEXT)
+  else:fill=('#2b3034' if active else PANEL2);edge=(LIGHT_GREY if active else EDGE);txt=(LIGHT_GREY if active else TEXT)
+  self.rect(x,y,w,h,fill,edge,1);self.text(x+w/2,y+h/2,label,size,MUTED if label=='DUPLICATE' and action is None else txt,'center',True);self.hitbox(x,y,w,h,'action',key,action)
  def checkbox(self,x,y,label,key):
   active=bool(self.toggle.get(key,False));box=16
   self.rect(x,y,box,box,'#11171a',ORANGE if active else EDGE)
@@ -409,7 +458,9 @@ class App(tk.Tk):
     yy=y+h*(1-t);self.line(x+6,yy,x+6,y+h,ORANGE,3)
    
    if mod_amt:
-    zero=y+h/2;end=clamp(zero-clamp(mod_amt/64,-1,1)*(h/2),y,y+h);self.line(x+10,zero,x+10,end,BLUE,2)
+    if bipolar:zero=y+h/2;end=clamp(zero-clamp(mod_amt/64,-1,1)*(h/2),y,y+h)
+    else:zero=y+h;end=clamp(zero-clamp(mod_amt/64,0,1)*h,y,y+h)
+    self.line(x+10,zero,x+10,end,BLUE,2)
    self.hitbox(x-7,y,26,h,'slider',key,(lo,hi,True,bipolar))
    if mod_amt:self.hitbox(x+7,min(zero,end)-4,8,abs(end-zero)+8,'modamount',key,(dn,routes))
   else:
@@ -418,7 +469,9 @@ class App(tk.Tk):
     c=x+w/2;end=x+w*t;self.line(c,y+4,end,y+4,ORANGE,3)
    else:self.line(x,y+4,x+w*t,y+4,ORANGE,3)
    if mod_amt:
-    zero=x+w/2;end=clamp(zero+clamp(mod_amt/64,-1,1)*(w/2),x,x+w);self.line(zero,y+1,end,y+1,BLUE,2)
+    if bipolar:zero=x+w/2;end=clamp(zero+clamp(mod_amt/64,-1,1)*(w/2),x,x+w)
+    else:zero=x;end=clamp(zero+clamp(mod_amt/64,0,1)*w,x,x+w)
+    self.line(zero,y+1,end,y+1,BLUE,2)
    self.hitbox(x,y-8,w,24,'slider',key,(lo,hi,False,bipolar))
    if mod_amt:self.hitbox(min(zero,end)-4,y-3,abs(end-zero)+8,8,'modamount',key,(dn,routes))
  def _curve(self,pts,fill=ORANGE,width=2,smooth=True):
@@ -456,23 +509,32 @@ class App(tk.Tk):
   self.canvas.create_image(self.X(x),self.Y(y),image=ph,anchor='nw')
   return True
  def _env_seconds(self,raw,stage='A'):
-  # Visual time model follows the documented 0..30 s envelope range.
+  # Audio/behaviour time model follows the documented 0..30 s envelope range.
+  # Graph geometry and marker animation use separate visual mappings below.
   # Zero is instantaneous; values 1..127 are exponentially distributed from 0.1 ms to 30 s.
   r=max(0,min(127,int(round(raw))))
   if r<=0:return 0.0
   return 0.0001*((30.0/0.0001)**((r-1)/126.0))
  def _env_visual_norm(self,raw):
-  """Nonlinear graph-only time mapping; MIDI/raw ADSR values are untouched."""
-  sec=self._env_seconds(raw)
-  if sec<=0:return 0.0
-  return clamp(math.log1p(sec/0.020)/math.log1p(30.0/0.020),0.0,1.0)
+  """Graph-only raw ADSR byte to normalized time-axis position."""
+  r=clamp(float(raw),0.0,127.0)/127.0
+  return r**ENV_TIME_CURVE
  def _env_visual_raw(self,normv):
+  """Inverse graph mapping used while dragging envelope points."""
   q=clamp(float(normv),0.0,1.0)
-  if q<=0:return 0
-  sec=0.020*(math.exp(q*math.log1p(30.0/0.020))-1.0)
-  if sec<=0.0001:return 1
-  raw=1+126*math.log(sec/0.0001)/math.log(30.0/0.0001)
-  return int(round(clamp(raw,1,127)))
+  return int(round((q**(1.0/ENV_TIME_CURVE))*127.0))
+ def _env_visual_seconds(self,raw):
+  """Graph-only duration: visible for short stages, capped for long stages."""
+  sec=self._env_seconds(raw)
+  if sec<=0.0:return 0.0
+  return max(ENV_ANIM_MIN,min(sec,ENV_ANIM_MAX))
+ def _env_geometry(self,key):
+  """Stable graph-only ADSR geometry shared by drawing, dragging and animation."""
+  A=self._env_visual_norm(self.values.get(key+'_A',0));D=self._env_visual_norm(self.values.get(key+'_D',0))
+  S=clamp(self.values.get(key+'_S',127)/127.0,0.0,1.0);R=self._env_visual_norm(self.values.get(key+'_R',0))
+  start=(.03,.90);attack=(.03+.22*A,.08);decay=(attack[0]+.22*D,.10+.78*(1-S))
+  sustain=(decay[0]+.26,decay[1]);release=(sustain[0]+.22*R,.90)
+  return start,attack,decay,sustain,release
  def _env_level(self,prefix,now=None):
   now=time.monotonic() if now is None else now
   A=self._env_seconds(self.values.get(prefix+'_A',0),'A');D=self._env_seconds(self.values.get(prefix+'_D',0),'D');S=self.values.get(prefix+'_S',127)/127;R=self._env_seconds(self.values.get(prefix+'_R',0),'R')
@@ -521,13 +583,12 @@ class App(tk.Tk):
  def _env_is_dynamic(self,now=None):
   now=time.monotonic() if now is None else now
   if self.env_gate:
-   # During attack/decay the value is changing; once sustain is reached no timer is needed.
-   a=max(self._env_seconds(self.values.get('FENV_A',0),'A'),self._env_seconds(self.values.get('AENV_A',0),'A'))
-   d=max(self._env_seconds(self.values.get('FENV_D',0),'D'),self._env_seconds(self.values.get('AENV_D',0),'D'))
-   return (now-self.env_phase_start) < (a+d)
+   f_end=self._env_visual_seconds(self.values.get('FENV_A',0))+self._env_visual_seconds(self.values.get('FENV_D',0))
+   a_end=self._env_visual_seconds(self.values.get('AENV_A',0))+self._env_visual_seconds(self.values.get('AENV_D',0))
+   return (now-self.env_phase_start)<max(f_end,a_end,ENV_ANIM_MIN)
   if self.env_release:
-   r=max(self._env_seconds(self.values.get('FENV_R',0),'R'),self._env_seconds(self.values.get('AENV_R',0),'R'))
-   if r<=0 or (now-self.env_phase_start)>=r:
+   r=max(self._env_visual_seconds(self.values.get('FENV_R',0)),self._env_visual_seconds(self.values.get('AENV_R',0)))
+   if (now-self.env_phase_start)>=max(r,ENV_ANIM_MIN):
     self.env_release=False
     return False
    return True
@@ -543,7 +604,8 @@ class App(tk.Tk):
    if not self.winfo_exists():return
   except Exception:return
   active=self._env_is_dynamic() or self._has_live_modulation()
-  if active and self.page=='SYNTH':self.redraw()
+  # Also draw the final frame which clears a finished pulse/release marker.
+  if self.page=='SYNTH':self.redraw()
   if active and not self._closing:self._anim_job=self.after(33,self._animation_tick)
  def graph(self,x,y,w,h,kind,key=None):
   # v1.33: graph content is drawn directly on the panel: no dark screen fill or border.
@@ -587,9 +649,8 @@ class App(tk.Tk):
     pts.append((5+xx*(w-10),h/2-yy*(h*.34)))
    lines.append((pts,ORANGE,1))
   elif kind=='env':
-   A=self._env_visual_norm(self.values.get(key+'_A',0));D=self._env_visual_norm(self.values.get(key+'_D',0));S=self.values.get(key+'_S',127)/127;R=self._env_visual_norm(self.values.get(key+'_R',0))
-   xa=.03+.27*A;xd=xa+.27*D;sx=(.69 if S>=.03 else xd);xr=sx+.27*R
-   coords=[(.03,.90),(xa,.08),(xd,.10+.78*(1-S)),(sx,.10+.78*(1-S)),(xr,.90)]
+   # Static ADSR geometry depends only on A/D/S/R. Playback never moves it.
+   coords=self._env_geometry(key)
    pts=[(5+xx*(w-10),5+yy*(h-10)) for xx,yy in coords];lines.append((pts,ORANGE,2))
   elif kind=='filter':
    now=time.monotonic();spacing=self.values.get('FILTER_SPACING',0);base1=self.values.get('F1_CUTOFF',127);base2=self.values.get('F2_CUTOFF',127)
@@ -612,14 +673,12 @@ class App(tk.Tk):
     self._curve(flat,color,width,False)
  def env_graph(self,x,y,w,h,key):
   self.graph(x,y,w,h,'env',key)
-  A=self._env_visual_norm(self.values.get(key+'_A',0));D=self._env_visual_norm(self.values.get(key+'_D',0));S=self.values.get(key+'_S',127)/127;R=self._env_visual_norm(self.values.get(key+'_R',0))
-  xa=.03+.27*A;xd=xa+.27*D;sx=(.69 if S>=.03 else xd);xr=sx+.27*R;sy=.10+.78*(1-S)
-  coords=[(xa,.08),(xd,sy),(sx,sy),(xr,.90)]
+  start,attack,decay,sustain,release=self._env_geometry(key);coords=[attack,decay,sustain,release]
   # Editing is point-only. Control points stay invisible until the pointer is over them
   # (or while the point is being dragged), leaving the envelope curve visually clean.
   # Sustain can be edited by dragging the horizontal S→R segment vertically.
-  if S>=.03 and sx>xd:
-   x1=x+5+xd*(w-10);x2=x+5+sx*(w-10);py=y+5+sy*(h-10)
+  if sustain[0]>decay[0]:
+   x1=x+5+decay[0]*(w-10);x2=x+5+sustain[0]*(w-10);py=y+5+decay[1]*(h-10)
    self.hitbox(x1,py-9,max(1,x2-x1),18,'envseg',key,(2,x,y,w,h,x1,py,x2,py))
   dragging=self.drag if self.drag and self.drag[4]=='envpoint' and self.drag[5]==key else None
   drag_idx=dragging[6][0] if dragging else None
@@ -630,30 +689,34 @@ class App(tk.Tk):
     r=4
     self.canvas.create_oval(self.X(px-r),self.Y(py-r),self.X(px+r),self.Y(py+r),fill=ui_theme.color(ORANGE),outline=ui_theme.color(ORANGE),width=0)
   # Separate live envelope indicator. This marker is visual only and never edits parameters.
-  marker=self._env_marker_position(key,coords)
+  marker=self._env_marker_position(key,coords,True)
   if marker is not None:
-   mx,my=marker;px=x+5+mx*(w-10);py=y+5+my*(h-10);r=2.8
+   mx,my,pulse=marker;px=x+5+mx*(w-10);py=y+5+my*(h-10);r=4.5 if pulse else 2.8
    self.canvas.create_oval(self.X(px-r),self.Y(py-r),self.X(px+r),self.Y(py+r),fill=WHITE,outline=WHITE,width=0)
- def _env_marker_position(self,key,coords):
+ def _env_marker_position(self,key,coords,include_pulse=False):
   if not (self.env_gate or self.env_release):return None
   now=time.monotonic();t=max(0.0,now-self.env_phase_start)
-  A0=self._env_seconds(self.values.get(key+'_A',0),'A');D0=self._env_seconds(self.values.get(key+'_D',0),'D');R0=self._env_seconds(self.values.get(key+'_R',0),'R');A=0 if A0<=0 else max(A0,.020);D=0 if D0<=0 else max(D0,.020);R=0 if R0<=0 else max(R0,.020)
+  A=self._env_visual_seconds(self.values.get(key+'_A',0));D=self._env_visual_seconds(self.values.get(key+'_D',0));R=self._env_visual_seconds(self.values.get(key+'_R',0))
   S=clamp(float(self.values.get(key+'_S',127))/127.0,0.0,1.0)
   start=(.03,.90);attack=coords[0];decay=coords[1];sustain=coords[2];release=coords[3]
   def lerp(p0,p1,q):
    q=clamp(q,0.0,1.0);return (p0[0]+(p1[0]-p0[0])*q,p0[1]+(p1[1]-p0[1])*q)
+  def result(point,pulse=False):return (point[0],point[1],pulse) if include_pulse else point
   if self.env_gate:
-   if A>0 and t<A:return lerp(start,attack,t/A)
+   if A>0 and t<A:
+    return result(lerp(start,attack,t/A))
+   if A<=0 and t<ENV_PULSE_SEC:return result(attack,True)
    td=max(0.0,t-A)
-   if D>0 and td<D:return lerp(attack,decay,td/D)
-   # Sustain is a held horizontal line; indicator remains at its beginning.
-   return decay
-  if R<=0:return None
+   if D>0 and td<D:
+    return result(lerp(attack,decay,td/D))
+   if D<=0 and td<ENV_PULSE_SEC:return result(decay,True)
+   return result(decay)
   level=clamp(self.env_release_levels.get(key,S),0.0,1.0)
   # Release starts from the actual envelope level at Note Off, not blindly from sustain.
-  sy=.10+.78*(1-level);release_start=(sustain[0],sy)
-  if t>=R:return None
-  return lerp(release_start,release,t/R)
+  release_start=(sustain[0],.10+.78*(1-level))
+  if R>0 and t<R:return result(lerp(release_start,release,t/R))
+  if R<=0 and t<ENV_PULSE_SEC:return result(release,True)
+  return None
  def param_value(self,key):
   return self.values.get(key,0)
  def redraw(self):
@@ -689,14 +752,13 @@ class App(tk.Tk):
    self.button(982,8,72,34,'INIT',False,init_action,size=9)
   self.button(1066,8,100,34,'SAVE AS',False,self.save_local_preset_as,size=10)
   self.button(1174,8,82,34,'SAVE',False,self.save_local_preset,size=10);self.button(1260,8,82,34,'STORE',False,self.store_locked,size=10);self.button(1350,8,43,34,'⚙',self.page=='SETTINGS',lambda:self.set_page('SETTINGS'),key='Settings',size=16)
-  self.button(1447,8,43,34,'◐',False,self.toggle_theme,key='Theme',size=16)
   self.button(1496,8,43,34,'⛶',False,self._show_scale_menu,size=15)
   self.keyboard_icon_button(1545,8,43,34)
 
  def keyboard_icon_button(self,x,y,w,h):
-  active=self.keyboard_visible;self.rect(x,y,w,h,ORANGE2 if active else PANEL2,ORANGE if active else EDGE)
+  active=self.keyboard_visible;self.rect(x,y,w,h,'#2b3034' if active else PANEL2,LIGHT_GREY if active else EDGE,1)
   ix=x+8;iy=y+8;iw=w-16;ih=h-15;kw=iw/3
-  for i in range(3):self.rect(ix+i*kw,iy,kw,ih,WHITE if not active else '#ffd0a2','#555')
+  for i in range(3):self.rect(ix+i*kw,iy,kw,ih,WHITE if not active else '#d7dbde','#555')
   self.rect(ix+kw*.72,iy,kw*.55,ih*.58,'#101214','#050505');self.rect(ix+kw*1.72,iy,kw*.55,ih*.58,'#101214','#050505')
   self.hitbox(x,y,w,h,'action',None,self.toggle_keyboard)
  def set_page(self,p):
@@ -711,18 +773,24 @@ class App(tk.Tk):
   top=self.Y(52);height=self.S(BASE_H-52)
   self.live_editor.place(x=self.X(0),y=top,width=self.S(BASE_W),height=height)
   self.live_editor.lift()
- def toggle_theme(self):
-  previous=ui_theme.current;ui_theme.set_theme('light' if previous=='dark' else 'dark')
-  self.settings['theme']=ui_theme.current;storage.save_settings(self.settings)
-  ui_theme.recolor_widgets(self,previous)
-  if self.live_editor is not None:self.live_editor.apply_theme()
-  self.redraw()
  def toggle_keyboard(self):
   self.keyboard_visible=not self.keyboard_visible
-  # Re-apply the current window preset so the keyboard gets its own vertical area
-  # without changing the scale of the main interface.
-  self._apply_ui_scale(self.settings.get('ui_scale','100%'),save=False)
-  self.redraw()
+  try:self.configure(bg=BG);self.canvas.configure(bg=BG)
+  except Exception:pass
+  # Grow/shrink the window by the keyboard height in *actual* pixels, keeping
+  # the current uniform scale. redraw() derives scale from the new canvas size.
+  w=self.winfo_width();h=self.winfo_height()
+  old_design=BASE_H+(0 if self.keyboard_visible else 170) if self.page!='SETTINGS' else BASE_H
+  new_design=self._design_height()
+  if old_design>0:
+   scale=min(w/BASE_W,h/old_design)
+   delta=round(170*scale) if self.keyboard_visible else -round(170*scale)
+   new_h=max(400,h+delta)
+   try:
+    x=self.winfo_x();y=self.winfo_y()
+    self.geometry(f'{w}x{new_h}+{x}+{y}')
+   except Exception:pass
+  self.after_idle(self.redraw)
  def _collect_params(self):
   # Local editor state only. Official opaque/binary .unosyp files remain binary-safe and are never rewritten by this path.
   return {'values':copy.deepcopy(self.values),'choice':copy.deepcopy(self.choice),'toggle':copy.deepcopy(self.toggle),'filter_link':self.filter_link}
@@ -953,7 +1021,7 @@ class App(tk.Tk):
   if self.settings.get('pr_change',True):self.midi.bank_program(n)
   self._schedule_hardware_refresh(n);self.redraw()
  def _dark_menu(self,parent=None):
-  return tk.Menu(parent or self,tearoff=0,bg='#11171a',fg=TEXT,activebackground='#30363a',activeforeground=WHITE,selectcolor=ORANGE,bd=1,relief='solid',font=('Segoe UI',11))
+  return tk.Menu(parent or self,tearoff=0,bg='#11171a',fg=TEXT,activebackground='#30363a',activeforeground=WHITE,selectcolor=ORANGE,bd=1,activeborderwidth=0,relief='flat',font=('Segoe UI',11))
  def open_preset_tree(self):
   m=self._dark_menu()
   hw=self._dark_menu(m)
@@ -1187,27 +1255,31 @@ class App(tk.Tk):
   my=790;mh=192;self.rect(10,my,1238,mh);self.text(24,my+10,'MOD MATRIX — 16 ROUTES',14,bold=True);self.text(90,my+38,'SOURCE',9,MUTED);self.text(420,my+38,'AMOUNT',9,MUTED);self.text(650,my+38,'DESTINATION',9,MUTED);self.text(1030,my+38,'FADE IN',9,MUTED)
   rowh=30;ctrlh=22;startrow=max(0,min(12,self.matrix_scroll))
   for vis,i in enumerate(range(startrow,startrow+4)):
-   yy=my+56+vis*rowh;self.text(27,yy+ctrlh/2,f'{i+1:02}',8,MUTED,'w');self.dropdown(70,yy,250,ctrlh,self.values.get(f'MSRC{i}','SOURCE'),f'MSRC{i}',MATRIX_SOURCES);self.slider(350,yy+ctrlh/2-4,220,'',f'MAMT{i}',-64,64,True,show_label=False);self.dropdown(600,yy,315,ctrlh,self.values.get(f'MDST{i}','DESTINATION'),f'MDST{i}',MATRIX_DESTINATIONS);self.slider(945,yy+ctrlh/2-4,260,'',f'MFADE{i}',0,127,False,show_label=False)
+   yy=my+56+vis*rowh;self.text(27,yy+ctrlh/2,f'{i+1:02}',8,MUTED,'w');self.dropdown(70,yy,250,ctrlh,self.values.get(f'MSRC{i}','SOURCE'),f'MSRC{i}',MATRIX_SOURCES);src=self.values.get(f'MSRC{i}','SOURCE');bi=self._matrix_source_bipolar(src);self.slider(350,yy+ctrlh/2-4,220,'',f'MAMT{i}',-64 if bi else 0,64,bi,show_label=False);self.dropdown(600,yy,315,ctrlh,self.values.get(f'MDST{i}','DESTINATION'),f'MDST{i}',MATRIX_DESTINATIONS);self.slider(945,yy+ctrlh/2-4,260,'',f'MFADE{i}',0,127,False,show_label=False)
   track_y=my+56;track_h=rowh*4;self.line(1228,track_y,1228,track_y+track_h,EDGE,3);thumb_h=track_h*4/16;thumb_y=track_y+(track_h-thumb_h)*(startrow/12 if 12 else 0);self.line(1228,thumb_y,1228,thumb_y+thumb_h,ORANGE,4)
+
+ def _matrix_source_bipolar(self,source):
+  # Source polarity is a UI property; unknown/ambiguous hardware inputs keep the legacy bipolar presentation.
+  unipolar={'Velocity','Mod Wheel','Aftertouch','Key Gate','Osc 1 Level','Osc 2 Level','Osc 3 Level','Noise','Filter 1 Cutoff','Filter 1 Res','Filter 2 Cutoff','Filter 2 Res','LFO 1 Fade In','LFO 2 Fade In','Filter Env','Amp Env','GATE 1 IN','GATE 2 IN','Accent','Gate','Tie'}
+  bipolar={'Key Pitch','Osc 1 Tune','Osc 2 Tune','Osc 3 Tune','Filter Spacing','LFO 1','LFO 2'}
+  if source in unipolar:return False
+  if source in bipolar:return True
+  return True
+
  def draw_seq(self):
   # v1.26 — fixed-size step grid, synced horizontal scrolling, vertical note scroll,
   # polymetric STEPS 1..64, active/inactive shading, 12-note chromatic colors.
   bottom=982
-  self.rect(10,60,295,bottom-60);self.text(28,78,'ARPEGGIATOR',15,bold=True)
-  self.button(28,108,120,46,'ON',self.arp_on,self.toggle_arp_on);self.button(160,108,123,46,'HOLD',self.toggle['ARP_HOLD'],lambda:self.toggle_param('ARP_HOLD'))
+  self.rect(10,60,295,bottom-60);self.pad_surface(20,68,273,34,PANEL2,EDGE,1,7);self.text(156.5,85,'ARPEGGIATOR',15,TEXT,'center',True)
+  self.transport_button(28,108,120,46,'ON',GREEN,self.arp_on,self.toggle_arp_on);self.transport_button(160,108,123,46,'HOLD',LIGHT_GREY,self.toggle['ARP_HOLD'],lambda:self.toggle_param('ARP_HOLD'))
   self.text(28,178,'MODE',9,MUTED);self.dropdown(112,166,171,38,ARP_MODES[self.choice['ARP_MODE']],'ARP_MODE',ARP_MODES)
   self.text(28,232,'RANGE',9,MUTED);self.dropdown(112,220,171,38,'1 OCT','ARP_RANGE',['1 OCT','2 OCT','3 OCT','4 OCT'])
   self.slider(72.5,390,170,'GATE','ARP_GATE',0,127);self.slider(72.5,450,170,'SWING','SWING',0,127)
   self.text(28,540,'PATTERN',10,bold=True)
   for i in range(16):
    r=i//8;c=i%8;self.button(28+c*32,562+r*46,27,38,str(i+1),self.arp_trig[i],lambda i=i:self.toggle_arp(i),size=8)
-  # Small in-panel manual: informative, low contrast, no extra frame.
-  self.text(157.5,676,'PATTERN QUICK GUIDE',8,MUTED,'center',True)
-  self.text(157.5,700,'ON STEP  — note plays',8,MUTED,'center')
-  self.text(157.5,720,'EMPTY STEP — MUTE',8,MUTED,'center')
-  self.text(157.5,740,'Click 1–16 to toggle a step',8,MUTED,'center')
 
-  sx,sy,sw=315,60,940;self.rect(sx,sy,sw,bottom-sy);self.text(333,78,'SEQUENCER',15,bold=True)
+  sx,sy,sw=315,60,940;self.rect(sx,sy,sw,bottom-sy);self.pad_surface(sx+10,68,sw-20,34,PANEL2,EDGE,1,7);self.text(sx+sw/2,85,'SEQUENCER',15,TEXT,'center',True)
   # 16 fixed-width columns are visible. More steps never shrink the cells.
   kx,ky,kw,kh=324,118,74,398;grid_x=398;grid_w=830;visible=16;cw=grid_w/visible
   seq_len=max(1,min(64,int(self.preset.sequence.length)))
@@ -1259,7 +1331,7 @@ class App(tk.Tk):
   if loaded_notes and min(loaded_notes)<self.seq_note_low:self.text(grid_x+grid_w-9,ky+kh-7,'▼',8,MUTED,'se',True)
   self.hitbox(grid_x,ky,grid_w,kh,'pianoroll','SEQ',{'gx':grid_x,'gy':ky,'gw':grid_w,'gh':kh,'visible':visible,'first':first,'rows':rows,'top_note':top_note})
   # Visible vertical scrollbar for full C0..C7 range.
-  vsx=1235;self.line(vsx,ky+4,vsx,ky+kh-4,EDGE,4);vrange=(96-rows+1)-12;thumbh=max(36,(kh-8)*rows/85);frac=(self.seq_note_low-12)/vrange if vrange else 0;vty=ky+4+((kh-8)-thumbh)*(1-frac);self.line(vsx,vty,vsx,vty+thumbh,ORANGE,5);self.hitbox(vsx-8,ky,16,kh,'seq_vscroll',None,{'y':ky,'h':kh,'thumb':thumbh,'range':vrange})
+  vsx=1235;self.line(vsx,ky+4,vsx,ky+kh-4,EDGE,4);vrange=(96-rows+1)-12;thumbh=max(36,(kh-8)*rows/85);frac=(self.seq_note_low-12)/vrange if vrange else 0;vty=ky+4+((kh-8)-thumbh)*(1-frac);self.line(vsx,vty,vsx,vty+thumbh,LIGHT_GREY,5);self.hitbox(vsx-8,ky,16,kh,'seq_vscroll',None,{'y':ky,'h':kh,'thumb':thumbh,'range':vrange})
   for col in range(visible):self.text(grid_x+(col+.5)*cw,528,str(first+col+1),8,TEXT if first+col<seq_len else MUTED,'center')
 
   head_y=548;bx=grid_x
@@ -1306,33 +1378,43 @@ class App(tk.Tk):
    self.play_indicator(px,ay,cw,ah)
   for col in range(visible+1):
    absolute=first+col;major=(absolute%4==0);self.line(grid_x+col*cw,ay,grid_x+col*cw,ay+ah,'#56636a' if major else '#263238',2 if major else 1)
+  raw_vals=lane.get('cc_values',[])
   for col in range(visible):
    sidx=first+col;v=display_value(lane,vals[sidx] if sidx<len(vals) else None)
-   if v is None or metadata.minimum is None:continue
-   yy=ay+(1-clamp(metadata.fraction(v),0,1))*(ah-10)+5;self.rect(grid_x+col*cw+cw*.28,yy-3,cw*.44,6,ORANGE,ORANGE)
+   if v is not None and metadata.minimum is not None:
+    frac=clamp(metadata.fraction(v),0,1)
+   elif sidx<len(raw_vals) and raw_vals[sidx] is not None:
+    # Captured 7-bit automation is safe to display as a normalized position; no unconfirmed device conversion.
+    frac=clamp(float(raw_vals[sidx])/127.0,0,1)
+   elif v is not None and isinstance(v,(int,float)):
+    # PARTIAL/unknown scale: show an existing normalized sample without claiming hardware units.
+    frac=clamp(float(v)/127.0,0,1)
+   else:
+    # Empty automation is visible at neutral zero immediately; no first pencil gesture required.
+    if metadata.minimum is None:frac=0.0
+    elif metadata.polarity=='bipolar':frac=clamp(metadata.fraction(0),0,1)
+    else:frac=0.0
+   yy=ay+(1-frac)*(ah-10)+5;self.rect(grid_x+col*cw+cw*.28,yy-3,cw*.44,6,ORANGE,ORANGE)
   self.hitbox(grid_x,ay,grid_w,ah,'modlane',self.seq_mod,{'gx':grid_x,'gy':ay,'gw':grid_w,'gh':ah,'visible':visible,'first':first})
   for col in range(visible):self.text(grid_x+(col+.5)*cw,ay+ah+13,str(first+col+1),8,TEXT if first+col<seq_len else MUTED,'center')
   # Shared horizontal scrollbar directly under Piano Roll; controls Piano Roll / Step Parameter / LINE automation together.
-  hsy=538;self.line(grid_x,hsy,grid_x+grid_w,hsy,EDGE,4);thumbw=grid_w*visible/64;htx=grid_x+(grid_w-thumbw)*(first/(64-visible));self.line(htx,hsy,htx+thumbw,hsy,ORANGE,5);self.hitbox(grid_x,hsy-8,grid_w,16,'seq_hscroll',None,{'x':grid_x,'w':grid_w,'thumb':thumbw})
+  hsy=538;self.line(grid_x,hsy,grid_x+grid_w,hsy,EDGE,4);thumbw=grid_w*visible/64;htx=grid_x+(grid_w-thumbw)*(first/(64-visible));self.line(htx,hsy,htx+thumbw,hsy,LIGHT_GREY,5);self.hitbox(grid_x,hsy-8,grid_w,16,'seq_hscroll',None,{'x':grid_x,'w':grid_w,'thumb':thumbw})
 
   rx=1265;rw=325;self.rect(rx,60,rw,bottom-60)
   self.button(rx+14,78,145,48,'PLAY ▶',self.seq_playing,self.toggle_seq_play);self.button(rx+166,78,145,48,'REC ●',self.seq_recording,self.toggle_seq_record)
-  self.rect(rx+10,140,rw-20,118);self.button(rx+24,156,132,46,'Dupl',False,self.seq_duplicate if self.preset.sequence.can_duplicate else None,size=10);self.button(rx+168,156,132,46,'Fill',self._seq_fill_flash,self.seq_fill,size=10);self.text(rx+rw/2,222,'Fill all 64 steps with sequences.',8,MUTED,'center')
-  self.rect(rx+10,270,rw-20,330);self.text(rx+24,286,'SEQUENCE SETTINGS',13,bold=True)
-  self.text(rx+24,330,'OVERDUB',9,TEXT);self.dropdown(rx+130,314,170,38,self.seq_overdub,'SEQ_OVERDUB',['MONO','POLY'])
-  self.text(rx+24,378,'TRANSPOSE',9,TEXT);self.dropdown(rx+130,362,170,38,str(self.preset.sequence.transpose),'SEQ_TRANS',list(range(-12,13)))
-  self.text(rx+24,426,'SWING',9,TEXT);self.slider(rx+130,426,120,'','SEQ_SWING',0,100,show_label=False);self.text(rx+282,430,f'{int(self.values.get("SEQ_SWING",0))}%',8,TEXT,'e')
-  # STEPS 1..64 uses the same thin-line language as numeric controls: drag + double-click entry.
-  self.text(rx+24,474,'STEPS',9,TEXT);steps_x,steps_y,steps_w=rx+130,474,170;self.text(steps_x+steps_w/2,450,str(seq_len),9,MUTED,'center');st=(seq_len-1)/63
-  self.line(steps_x,steps_y+4,steps_x+steps_w,steps_y+4,EDGE,3);self.line(steps_x,steps_y+4,steps_x+steps_w*st,steps_y+4,ORANGE,3)
-  self.hitbox(steps_x,steps_y-8,steps_w,24,'seq_steps','SEQ_STEPS',(1,64,False,False))
-  guide_cx=rx+rw/2;mouse_icon=Path(__file__).resolve().parent/'Assets'/'MOUSE_NO_ARROWS.png'
-  self.text(guide_cx,632,'QUICK GUIDE',8,MUTED,'center',True)
-  self.asset_icon(mouse_icon,guide_cx-70,646,22,22);self.text(guide_cx+6,656,'— edit step',8,MUTED,'center')
-  self.text(guide_cx-62,676,'SHIFT +',8,MUTED,'center');self.asset_icon(mouse_icon,guide_cx-37,666,22,22);self.text(guide_cx+48,676,'— Pencil (4 points / step)',8,MUTED,'center')
-  self.text(guide_cx,696,'Mouse wheel over Piano Roll — notes',8,MUTED,'center')
-  self.text(guide_cx,716,'Horizontal bar — steps 1–64',8,MUTED,'center')
-  self.text(guide_cx,736,'Double-click STEPS — type 1–64',8,MUTED,'center')
+  # One SEQUENCE SETTINGS frame, agreed order.
+  sy0=140;self.rect(rx+10,sy0,rw-20,490);self.text(rx+24,sy0+16,'SEQUENCE SETTINGS',13,bold=True)
+  row=sy0+58
+  self.text(rx+24,row+18,'STEPS',9,TEXT);self.button(rx+130,row,170,38,f'{seq_len}',False,self._open_steps_palette,size=10)
+  row+=48;self.text(rx+24,row+18,'OVERDUB',9,TEXT);self.dropdown(rx+130,row,170,38,self.seq_overdub,'SEQ_OVERDUB',['MONO','POLY'])
+  row+=48;self.text(rx+24,row+18,'SWING',9,TEXT);self.slider(rx+130,row+18,120,'','SEQ_SWING',0,100,show_label=False);self.text(rx+300,row+18,f'{int(self.values.get("SEQ_SWING",0))}%',8,TEXT,'e')
+  row+=48;self.text(rx+24,row+18,'METRONOME',9,TEXT);self.button(rx+130,row,54,38,'♩',self.seq_metronome,self.toggle_seq_metronome,size=15)
+  row+=48;self.text(rx+24,row+18,'COUNT-IN',9,TEXT);self.dropdown(rx+130,row,170,38,self.seq_count_in,'SEQ_COUNTIN',['OFF','1 BAR','2 BAR','4 BAR'])
+  row+=48;self.text(rx+24,row+18,'QUANTIZE',9,TEXT);self.dropdown(rx+130,row,170,38,self.seq_quantize,'SEQ_QUANTIZE',['OFF','1/32','1/16','1/8','1/4'])
+  row+=48;self.text(rx+24,row+18,'GROOVE',9,TEXT);self.dropdown(rx+130,row,170,38,self.seq_groove,'SEQ_GROOVE',['STRAIGHT','SWING','MPC','PUSH','LAID BACK','HUMANIZE'])
+  row+=48;self.text(rx+24,row+18,'AMOUNT',9,TEXT);self.slider(rx+130,row+18,120,'','SEQ_GROOVE_AMOUNT',0,100,show_label=False);self.text(rx+300,row+18,f'{int(self.values.get("SEQ_GROOVE_AMOUNT",0))}%',8,TEXT,'e')
+  # DUPLICATE + FILL live together below Sequence Settings. No helper caption.
+  fy=646;self.rect(rx+10,fy,rw-20,82);self.button(rx+24,fy+18,132,46,'DUPLICATE',False,self.seq_duplicate if self.preset.sequence.can_duplicate_to_next_bar else None,size=9);self.button(rx+168,fy+18,132,46,'FILL',self._seq_fill_flash,self.seq_fill,size=10)
 
  def _song_tree_rows(self):
   rows=[]
@@ -1380,8 +1462,8 @@ class App(tk.Tk):
    col=idx%4;row=idx//4;x=gx+col*(cellw+gap);y=gy+row*(cellh+gap)
    if self.song_mode=='SONG':name=self.song.slots[idx].preset_name
    else:name=Path(self.live_slots[idx]).stem if self.live_slots[idx] else 'EMPTY'
-   active=(idx==self.selected_song_slot if self.song_mode=='SONG' else idx==self.selected_live_slot);fill=ORANGE2 if active else PANEL2;outline=ORANGE if active else EDGE
-   self.rect(x,y,cellw,cellh,fill,outline);self.text(x+10,y+cellh/2,f'{idx+1:02}',9,ORANGE if active else TEXT,'w');self.text(x+58,y+cellh/2,name,10,TEXT if name!='EMPTY' else MUTED,'w');self.hitbox(x,y,cellw,cellh,'songcell',idx,None)
+   active=(idx==self.selected_song_slot if self.song_mode=='SONG' else idx==self.selected_live_slot);fill='#2b3034' if active else PANEL2;outline=LIGHT_GREY if active else EDGE
+   self.pad_surface(x,y,cellw,cellh,fill,outline,2 if active else 1,6);self.text(x+10,y+cellh/2,f'{idx+1:02}',9,LIGHT_GREY if active else TEXT,'w');self.text(x+58,y+cellh/2,name,10,TEXT if name!='EMPTY' else MUTED,'w');self.hitbox(x,y,cellw,cellh,'songcell',idx,None)
   # controls
   rx=1325;rw=265;self.rect(rx,top,rw,lh);self.text(rx+14,118,'SONG CONTROLS' if self.song_mode=='SONG' else 'LIVE CONTROLS',14,bold=True)
   if self.song_mode=='SONG':
@@ -1418,7 +1500,7 @@ class App(tk.Tk):
   cols=['#e34b4b','#ed8b32','#e2c744','#63b85b','#4d9fdf','#786bd6','#c05ac4']
   for i,c in enumerate(cols):
    active=i in self.lib_color_filters
-   self._draw_aa_circle(x+15,y+15,14,c,WHITE if active else EDGE,2 if active else 1)
+   self._draw_aa_circle(x+15,y+15,14,c,LIGHT_GREY if active else EDGE,1)
    self.hitbox(x,y,30,30,'libtool',f'Tag {i+1}',lambda i=i:self._toggle_lib_color(i));x+=30
   return x
 
@@ -1492,12 +1574,11 @@ class App(tk.Tk):
    col=n//rows;row=n%rows;xx=x+10+col*col_w-off;yy=y+21+row*30
    if xx+col_w<x or xx>x+w:continue
    sel=self.lib_selected==fp
-   if sel:self.rect(xx-4,yy-11,col_w-5,25,ORANGE2,ORANGE)
+   if sel:self.rect(xx-4,yy-11,col_w-5,25,'#292f33',LIGHT_GREY,1)
    num=files.index(fp)+1; name=fp.stem; disp=name if len(name)<=25 else name[:22]+'…'; disp=f'[{num:03d}] {disp}'
    # Reserve a measured gap for tags so punctuation never overlaps the name.
-   self.text(xx,yy,disp,11,ORANGE if sel else TEXT,'w')
+   self.text(xx,yy,disp,11,LIGHT_GREY if sel else TEXT,'w')
    meta=getattr(self,'_lib_meta_cache',{}).get(fp) or storage.get_preset_metadata(fp);tagx=xx+min(col_w-34,max(20,len(disp)*7.4+12))
-   if meta.get('favorite'):self.text(tagx,yy,'★',10,ORANGE,'w');tagx+=13
    # Tag data/filtering remain; visual tag circles are intentionally omitted.
    self.hitbox(xx-4,yy-12,col_w-5,27,'libpreset',idx,(fp,fp.stem))
   if max_scroll>0:
@@ -1515,7 +1596,7 @@ class App(tk.Tk):
    # Keep the buttons in place and visibly disabled so the layout never jumps.
    for bx in (recv_x,send_x):
     self.canvas.create_rectangle(self.X(bx),self.Y(y),self.X(bx+38),self.Y(y+30),fill='#111416',outline='',stipple='gray50')
-  body_y=y+42;self.rect(x,body_y,w,h-42,'#111416',LIGHT_GREY,2);self.rect(x+5,body_y+5,w-10,h-52,'#111416',EDGE)
+  body_y=y+42;self.rect(x,body_y,w,h-42,'#111416',EDGE,1)
   if self.lib_right_mode=='UNO':
    self._draw_uno_slots(x,body_y,w,h-42)
   else:
@@ -1530,8 +1611,8 @@ class App(tk.Tk):
    col=(n-1)//rows;row=(n-1)%rows;xx=x+10+col*col_w-off;yy=y+20+row*30
    if xx < x+6 or xx+col_w > x+w-6:continue
    sel=n==getattr(self,'lib_hw_selected',self.hardware_selected)
-   if sel:self.rect(xx-4,yy-10,col_w-8,28,ORANGE2,ORANGE)
-   self.text(xx+4,yy,f'{n:03d}',11,ORANGE if sel else TEXT,'w');name=self.hardware_names.get(n,'—') or '—';self.text(xx+54,yy,name[:24],10,TEXT if self.hardware_names.get(n) else MUTED,'w');self.hitbox(xx-4,yy-10,col_w-8,28,'hwslot',n)
+   if sel:self.rect(xx-4,yy-10,col_w-8,28,'#292f33',LIGHT_GREY,1)
+   self.text(xx+4,yy,f'{n:03d}',11,LIGHT_GREY if sel else TEXT,'w');name=self.hardware_names.get(n,'—') or '—';self.text(xx+54,yy,name[:24],10,(LIGHT_GREY if sel else (TEXT if self.hardware_names.get(n) else MUTED)),'w');self.hitbox(xx-4,yy-10,col_w-8,28,'hwslot',n)
   if max_scroll>0:
    track_y=y+h-13;self.line(x+8,track_y,x+w-8,track_y,EDGE,3);thumb=max(32,(w-16)*w/content_w);pos=(w-16-thumb)*(self.lib_hscroll[1]/max_scroll if max_scroll else 0)
    self.line(x+8+pos,track_y,x+8+pos+thumb,track_y,LIGHT_GREY,5);self.hitbox(x+8,track_y-8,w-16,16,'libxscroll',1,{'max':max_scroll,'thumb':thumb,'w':w-16,'x':x+8})
@@ -1583,6 +1664,27 @@ class App(tk.Tk):
   if p:
    try:p.destroy()
    except Exception:pass
+ def _open_tag_assignment(self,path,x_root,y_root):
+  path=Path(path);meta=storage.get_preset_metadata(path);selected=set(meta.get('colors',[]));cols=['#e34b4b','#ed8b32','#e2c744','#63b85b','#4d9fdf','#786bd6','#c05ac4']
+  win=tk.Toplevel(self);win.overrideredirect(True);win.configure(bg=EDGE);win.transient(self)
+  try:win.attributes('-topmost',True)
+  except Exception:pass
+  c=tk.Canvas(win,width=7*30+12,height=42,bg=PANEL2,highlightthickness=1,highlightbackground=EDGE);c.pack()
+  def draw():
+   c.delete('all')
+   for i,col in enumerate(cols):
+    cx=21+i*30;cy=21;r=7
+    # Same 14 px tag-circle diameter as the sorting/filter toolbar. Selection adds only an outside 1 px light-grey ring.
+    if i in selected:c.create_oval(cx-r-2,cy-r-2,cx+r+2,cy+r+2,outline=LIGHT_GREY,width=1)
+    c.create_oval(cx-r,cy-r,cx+r,cy+r,fill=col,outline=EDGE,width=1)
+  def click(ev):
+   i=int((ev.x-6)//30)
+   if not 0<=i<7:return
+   if i in selected:selected.remove(i)
+   else:selected.add(i)
+   m=storage.get_preset_metadata(path);m['colors']=sorted(selected);storage.set_preset_metadata(path,m);draw();self.redraw()
+  c.bind('<Button-1>',click);win.bind('<Escape>',lambda e:win.destroy());draw();win.update_idletasks()
+  ww,wh=win.winfo_reqwidth(),win.winfo_reqheight();x=max(0,min(int(x_root),win.winfo_screenwidth()-ww));y=max(0,min(int(y_root),win.winfo_screenheight()-wh));win.geometry(f'+{x}+{y}');win.focus_force()
  def _preset_context_menu(self,e,path):
   path=Path(path);self.lib_selected=path;self.redraw()
   m=self._library_menu();tags=self._library_menu(m)
@@ -1671,7 +1773,7 @@ class App(tk.Tk):
   rows=[('MIDI IN','midi_in',ins),('MIDI OUT','midi_out',outs),('MIDI CONTROLLER','midi_controller',controllers),('MIDI IN CHANNEL','midi_in_channel',['OMNI']+list(range(1,17))),('MIDI OUT CHANNEL','midi_out_channel',list(range(1,17))),('MIDI CLOCK','midi_clock',['Off','MIDI MASTER']),('SYNC','sync',['Internal','External','USB']),('MIDI INTERFACE','midi_interface',['Auto','Off','On'])]
   for i,(lab,key,opts) in enumerate(rows):
    y=145+i*82;self.text(55,y,lab,11,MUTED);self.settings_dropdown(320,y-10,410,40,self._display_setting(self.settings.get(key,opts[0])),key,opts)
-  self.text(820,155,'UNO Pro Advanced',20,TEXT,bold=True);self.text(820,192,'Version 0.9.5-beta',11,MUTED)
+  self.text(820,155,'UNO Pro Advanced',20,TEXT,bold=True);self.text(820,192,'Version 0.9.7-beta',11,MUTED)
   self.text(820,240,'Editor / librarian for IK Multimedia UNO Synth Pro',10,TEXT)
   self.text(820,270,'Hardware STORE remains locked until 0x28 is fully validated.',9,MUTED)
   self.button(530,820,202,44,'APPLY',self.settings_dirty,self.apply_settings if self.settings_dirty else None)
@@ -1685,17 +1787,21 @@ class App(tk.Tk):
   self._start_midi_connect(save=False,initial=False);self.redraw()
  def save_settings(self):self.apply_settings()
  def _keyboard_key_shape(self,x,y,w,h,fill,outline,r=5):
-  # Straight top corners; only the two bottom corners are rounded.
-  import math
-  r=max(1,min(float(r),w/4,h/5));pts=[(x,y),(x+w,y),(x+w,y+h-r)]
-  for a in (0,22.5,45,67.5,90):
-   rad=math.radians(a);pts.append((x+w-r+r*math.cos(rad),y+h-r+r*math.sin(rad)))
-  for a in (90,112.5,135,157.5,180):
-   rad=math.radians(a);pts.append((x+r+r*math.cos(rad),y+h-r+r*math.sin(rad)))
-  pts.append((x,y))
-  flat=[]
-  for px,py in pts:flat.extend((self.X(px),self.Y(py)))
-  self.canvas.create_polygon(*flat,fill=fill,outline=outline,width=max(1,int(self.S(1))),smooth=False)
+  # Anti-aliased key with straight top and smoothly rounded bottom corners.
+  if PIL_OK:
+   try:
+    sc=max(.5,float(self.scale));tw=max(3,int(round(w*sc)));th=max(3,int(round(h*sc)));ss=4;W,H=tw*ss,th*ss;rr=max(2,int(r*sc*ss))
+    img=Image.new('RGBA',(W,H),(0,0,0,0));mask=Image.new('L',(W,H),0);md=ImageDraw.Draw(mask)
+    md.rectangle((0,0,W-1,max(0,H-rr-1)),fill=255);md.rounded_rectangle((0,max(0,H-2*rr),W-1,H-1),radius=rr,fill=255)
+    base=ui_theme.color(fill).lstrip('#');rgb=[int(base[i:i+2],16) for i in (0,2,4)]
+    grad=Image.new('RGBA',(W,H),(0,0,0,0));gd=ImageDraw.Draw(grad)
+    # Edges slightly lighter, centre slightly darker.
+    for yy in range(H):
+     q=abs((yy/(max(1,H-1)))-.5)*2;f=.955+.075*q;col=tuple(max(0,min(255,round(v*f))) for v in rgb)+(255,);gd.line((0,yy,W,yy),fill=col)
+    grad.putalpha(mask);img.alpha_composite(grad);dr=ImageDraw.Draw(img);oc=ui_theme.color(outline);dr.line((0,0,W-1,0),fill=oc,width=max(1,ss));dr.line((0,0,0,H-rr),fill=oc,width=max(1,ss));dr.line((W-1,0,W-1,H-rr),fill=oc,width=max(1,ss));dr.arc((0,H-2*rr,2*rr,H-1),90,180,fill=oc,width=max(1,ss));dr.line((rr,H-1,W-rr,H-1),fill=oc,width=max(1,ss));dr.arc((W-2*rr-1,H-2*rr,W-1,H-1),0,90,fill=oc,width=max(1,ss))
+    img=img.resize((tw,th),Image.Resampling.LANCZOS);ph=ImageTk.PhotoImage(img);self._graph_images.append(ph);self.canvas.create_image(self.X(x),self.Y(y),image=ph,anchor='nw');return
+   except Exception:pass
+  self.rect(x,y,w,h,fill,outline,1,r)
  def draw_keyboard(self):
   # Borderless three-octave performance panel. It is drawn inside the 1600x1000 design area.
   y=1000;panel_h=162
@@ -1708,18 +1814,24 @@ class App(tk.Tk):
   mx=140;self.rect(mx,strip_y,strip_w,strip_h,'#0b0e10',EDGE);mv=clamp(self.values.get('MOD_WHEEL',0),0,127)/127;fill_h=(strip_h-12)*mv;self.rect(mx+7,strip_y+strip_h-6-fill_h,strip_w-14,fill_h,ORANGE2,ORANGE);self.hitbox(mx-4,strip_y-4,strip_w+8,strip_h+8,'modwheel')
   # Pitch Bend Range selector / step control.
   ranges=[2,4,6,8,12,24];cur=int(self.settings.get('pitch_bend_range',2));cur=cur if cur in ranges else 2
-  rx=202;self.text(rx+46,y+22,'PB RANGE',8,MUTED,'center');self.button(rx,y+42,30,42,'◀',False,lambda:self._step_pb_range(-1),size=9);self.text(rx+46,y+63,str(cur),13,TEXT,'center',True);self.button(rx+62,y+42,30,42,'▶',False,lambda:self._step_pb_range(1),size=9)
+  rx=202;self.text(rx+46,y+16,'PB RANGE',8,MUTED,'center');self.button(rx,y+32,30,38,'◀',False,lambda:self._step_pb_range(-1),size=9);self.text(rx+46,y+51,str(cur),13,TEXT,'center',True);self.button(rx+62,y+32,30,38,'▶',False,lambda:self._step_pb_range(1),size=9);self.button(rx,y+82,92,38,'TRANSPOSE',self.transpose_mode,self.toggle_transpose_mode,size=8)
   # Three octaves, stretched to the full available panel height; width follows key proportions.
   kx=312;kh=panel_h-8;ky=y+4;octs=3;white_count=octs*7;kw=1260;ww=kw/white_count;start=max(0,min(91,36+self.keyboard_octave_shift*12));active=self.keys_down|self.hw_keys_down
   whites=[n for n in range(start,start+octs*12+1) if n%12 not in (1,3,6,8,10)]
   for i,n in enumerate(whites[:white_count]):
    pressed=n in active;off=3 if pressed else 0;x=kx+i*ww
-   self._keyboard_key_shape(x,ky+off,ww,kh-off,ORANGE2 if pressed else WHITE,ORANGE if pressed else '#333',5);self.hitbox(x,ky,ww,kh,'key',n)
+   self._keyboard_key_shape(x,ky+off,ww,kh-off,'#d9dde0' if pressed else WHITE,LIGHT_GREY if pressed else '#333',5);self.hitbox(x,ky,ww,kh,'key',n)
   wi=0
   for n in range(start,start+octs*12):
    if n%12 in (1,3,6,8,10):
-    pressed=n in active;off=3 if pressed else 0;x=kx+(wi-.32)*ww;self._keyboard_key_shape(x,ky+off,ww*.62,kh*.61-off,ORANGE2 if pressed else '#101214',ORANGE if pressed else '#050505',4);self.hitbox(x,ky,ww*.62,kh*.65,'key',n)
+    pressed=n in active;off=3 if pressed else 0;x=kx+(wi-.32)*ww;self._keyboard_key_shape(x,ky+off,ww*.62,kh*.61-off,'#30363a' if pressed else '#101214',LIGHT_GREY if pressed else '#050505',4);self.hitbox(x,ky,ww*.62,kh*.65,'key',n)
    else:wi+=1
+ def toggle_transpose_mode(self):
+  if not self.transpose_mode:
+   self._transpose_original=int(self.preset.sequence.transpose);self.transpose_mode=True;self.status='TRANSPOSE: choose a key'
+  else:
+   self.preset.sequence.transpose=int(self._transpose_original);self.transpose_mode=False;self.transpose_preview=0;self.status='TRANSPOSE OFF'
+  self.redraw()
  def _keyboard_octave(self,d):
   self.keyboard_octave_shift=max(-3,min(4,int(self.keyboard_octave_shift)+int(d)));self.redraw()
  def _step_pb_range(self,d):
@@ -1760,7 +1872,10 @@ class App(tk.Tk):
       self.drag=(hx,hy,hw,hh,'modpencil',key,data);self._modpencil(x,y,data)
      else:
       self.drag=(hx,hy,hw,hh,'modlane',key,data);self._modlane_step(x,y,data)
-    elif kind=='key':self.midi.note_on(key,100);self.keys_down.add(key);self._env_note_on();self.redraw()
+    elif kind=='key':
+     if self.transpose_mode:
+      base=max(0,min(91,36+self.keyboard_octave_shift*12));self.transpose_preview=max(-24,min(24,int(key-base)));self.preset.sequence.transpose=self._transpose_original+self.transpose_preview;self.status=f'TRANSPOSE {self.transpose_preview:+d}';self.redraw()
+     else:self.midi.note_on(key,100);self.keys_down.add(key);self._env_note_on();self.redraw()
     elif kind=='pitchwheel':self.drag=h;self._wheel_pitch(y,hy,hh)
     elif kind=='modwheel':self.drag=h;self._wheel_mod(y,hy,hh)
     elif kind=='songlist':
@@ -1940,12 +2055,11 @@ class App(tk.Tk):
   idx=int(self.drag[5]) if self.drag and self.drag[4]=='libxscroll' else 0;self.lib_hscroll[idx]=round(frac*float(d['max']));self.redraw()
  def _drag_env_point(self,h,x,y):
   _,_,_,_,_,key,data=h;idx,gx,gy,gw,gh=data;nx=clamp((x-gx-5)/(gw-10),.03,.96);ny=clamp((y-gy-5)/(gh-10),.08,.90)
-  A=self._env_visual_norm(self.values.get(key+'_A',0));D=self._env_visual_norm(self.values.get(key+'_D',0));S=clamp(self.values.get(key+'_S',127)/127,0,1)
-  xa=.03+.27*A;xd=xa+.27*D;sx=(.69 if S>=.03 else xd);updates=[]
-  if idx==0:updates=[(key+'_A',self._env_visual_raw((nx-.03)/.27))]
-  elif idx==1:updates=[(key+'_D',self._env_visual_raw((nx-xa)/.27)),(key+'_S',round(clamp(1-(ny-.10)/.78,0,1)*127))]
+  _,attack,decay,sustain,_=self._env_geometry(key);xa=attack[0];sx=sustain[0];updates=[]
+  if idx==0:updates=[(key+'_A',self._env_visual_raw((nx-.03)/.22))]
+  elif idx==1:updates=[(key+'_D',self._env_visual_raw((nx-xa)/.22)),(key+'_S',round(clamp(1-(ny-.10)/.78,0,1)*127))]
   elif idx==2:updates=[(key+'_S',round(clamp(1-(ny-.10)/.78,0,1)*127))]
-  else:updates=[(key+'_R',self._env_visual_raw((nx-sx)/.27))]
+  else:updates=[(key+'_R',self._env_visual_raw((nx-sx)/.22))]
   for k,v in updates:
    v=int(clamp(v,0,127));self.values[k]=v
    if k in CC:self._send_cc_ui(k,self._encode_cc_value(k,v,0,127))
@@ -2207,6 +2321,9 @@ class App(tk.Tk):
   if key=='SEQ_TRANS':return self.preset.sequence.transpose
   if key=='SEQ_OVERDUB':return self.seq_overdub
   if key=='SEQ_RES':return self.seq_resolution
+  if key=='SEQ_COUNTIN':return self.seq_count_in
+  if key=='SEQ_QUANTIZE':return self.seq_quantize
+  if key=='SEQ_GROOVE':return self.seq_groove
   if key=='SEQ_TARGET':return self.automation_parameter
   if key=='ARP_RANGE':return self.values.get('ARP_RANGE','1 OCT')
   if key=='SEQ_KB_RANGE':return self.values.get('SEQ_KB_RANGE','C2')
@@ -2277,6 +2394,9 @@ class App(tk.Tk):
   if key=='SEQ_TRANS':self.preset.sequence.transpose=int(value);self.redraw();return
   if key=='SEQ_OVERDUB':self.seq_overdub=str(value);self.redraw();return
   if key=='SEQ_RES':self.seq_resolution=str(value);self.redraw();return
+  if key=='SEQ_COUNTIN':self.seq_count_in=str(value);self.redraw();return
+  if key=='SEQ_QUANTIZE':self.seq_quantize=str(value);self.redraw();return
+  if key=='SEQ_GROOVE':self.seq_groove=str(value);self.redraw();return
   if key=='SEQ_TARGET':self.automation_parameter=str(value);self.redraw();return
   if key=='ARP_RANGE':
    self.values[key]=value
@@ -2286,7 +2406,13 @@ class App(tk.Tk):
    self.redraw();return
   if key=='SEQ_KB_RANGE':self.values[key]=value;self.redraw();return
   if key.startswith('MSRC') or key.startswith('MDST'):
-   self.values[key]=value;self.redraw();self._ensure_animation();return
+   self.values[key]=value
+   if key.startswith('MSRC'):
+    try:
+     i=int(key[4:]);ak=f'MAMT{i}'
+     if not self._matrix_source_bipolar(value) and self.values.get(ak,0)<0:self.values[ak]=0
+    except Exception:pass
+   self.redraw();self._ensure_animation();return
   if key in self.choice:
    vals=list(opts);self.choice[key]=vals.index(value) if value in vals else 0
    if key in ('F1_MODE','F2_MODE'):self.midi.send_cc(CC[key],([0,25,50,75,100] if key=='F1_MODE' else [0,20,40,60,80,100])[self.choice[key]])
@@ -2325,7 +2451,7 @@ class App(tk.Tk):
  def _modlane_step(self,x,y,d):
   gx,gy,gw,gh,visible=d['gx'],d['gy'],d['gw'],d['gh'],d['visible'];col=int(clamp((x-gx)/(gw/visible),0,visible-1));s=d.get('first',0)+col;t=clamp(1-(y-gy)/gh,0,1)
   lane=self.automation_lane();metadata=PARAMETERS[lane['parameter']]
-  if metadata.minimum is None or metadata.status.startswith('PARTIAL') or lane.get('units')!='device-ui':return
+  if metadata.minimum is None or lane.get('units')!='device-ui':return
   vals=lane.setdefault('values',[None]*64)
   while len(vals)<64:vals.append(64)
   vals[s]=metadata.value(t)
@@ -2358,8 +2484,48 @@ class App(tk.Tk):
  def set_seq_param(self,p):self.seq_param=p;self.redraw()
  def set_mod(self,i):self.seq_mod=i;self.redraw()
  def automation_lane(self):return parameter_line(self.preset.sequence,getattr(self,'automation_parameter','CUTOFF 1'))
+ def _open_steps_palette(self):
+  # 8x8 numeric palette using the same dark popup/cell language as ColorPalette.
+  cell_w,cell_h=20,16;cols=8;rows=8;ww=cols*cell_w+2;wh=rows*cell_h+2
+  win=tk.Toplevel(self);win.withdraw();win.overrideredirect(True);win.configure(bg=EDGE);win.resizable(False,False);win.transient(self)
+  try:win.attributes('-topmost',True)
+  except Exception:pass
+  c=tk.Canvas(win,width=ww-2,height=wh-2,bg=PANEL2,highlightthickness=1,highlightbackground=EDGE);c.pack()
+  cur=max(1,min(64,int(self.preset.sequence.length)))
+  for i in range(64):
+   n=i+1;r=i//8;col=i%8;x=1+col*cell_w;y=1+r*cell_h;sel=n<=cur
+   c.create_rectangle(x+2,y+2,x+cell_w-2,y+cell_h-2,fill=('#343a3f' if sel else PANEL2),outline=(LIGHT_GREY if sel else EDGE),width=1)
+   c.create_text(x+cell_w/2,y+cell_h/2,text=str(n),fill=(LIGHT_GREY if sel else TEXT),font=('Segoe UI',7))
+  def pick(ev):
+   col=int((ev.x-1)//cell_w);row=int((ev.y-1)//cell_h)
+   if 0<=col<8 and 0<=row<8:self._choose_seq_steps(row*8+col+1,win)
+  c.bind('<Button-1>',pick);win.update_idletasks()
+  try:px=self.canvas.winfo_rootx()+int(self.X(1265+130+170))+4;py=self.canvas.winfo_rooty()+int(self.Y(140+58))
+  except Exception:px=self.winfo_pointerx();py=self.winfo_pointery()
+  sw,sh=win.winfo_screenwidth(),win.winfo_screenheight();px=max(0,min(int(px),sw-ww));py=max(0,min(int(py),sh-wh));win.geometry(f'{ww}x{wh}+{px}+{py}');win.deiconify();win.lift();win.grab_set();win.focus_force();win.bind('<Escape>',lambda e:win.destroy())
+ def _choose_seq_steps(self,n,win=None):
+  self.preset.sequence.length=max(1,min(64,int(n)));self.sequence_origin='SOFTWARE';self.status=f'STEPS = {n}'
+  if win:
+   try:win.destroy()
+   except Exception:pass
+  self.redraw()
+ def toggle_seq_metronome(self):self.seq_metronome=not self.seq_metronome;self.redraw()
+ def _seq_click(self,accent=False):
+  try:self.bell()
+  except Exception:pass
+ def _begin_seq_record_now(self):
+  self.seq_recording=True
+  if not self.seq_playing:self.toggle_seq_play()
+  self.status='REC — notes + selected parameter automation';self.redraw()
+ def _seq_countin_tick(self):
+  if self._seq_countin_left<=0:self._seq_countin_job=None;self._begin_seq_record_now();return
+  beat_index=self._seq_countin_left%4;self._seq_click(beat_index==0);self._seq_countin_left-=1
+  bpm=max(20,min(300,int(getattr(self.song,'tempo',120) or 120)));self._seq_countin_job=self.after(max(1,round(60000/bpm)),self._seq_countin_tick)
  def seq_duplicate(self):
-  try:self.preset.sequence.duplicate();self.sequence_origin='SOFTWARE';self.status='Sequence duplicated'
+  # Duplicate through the bar containing the last note, then place the copy at
+  # the first step of the next bar. Bar size follows the current sequencer resolution.
+  steps_per_bar={'1/4':4,'1/8':8,'1/16':16,'1/32':32}.get(str(self.seq_resolution),16)
+  try:self.preset.sequence.duplicate_to_next_bar(steps_per_bar);self.sequence_origin='SOFTWARE';self.status='Sequence duplicated'
   except ValueError as error:self.status=str(error)
   self.redraw()
  def seq_fill(self):
@@ -2449,11 +2615,18 @@ class App(tk.Tk):
    self._clock_master_stop();self._seq_all_notes_off();self.midi.stop();self.status='PLAY STOPPED'
   self.redraw()
  def toggle_seq_record(self):
-  self.seq_recording=not self.seq_recording
-  if self.seq_recording:
-   self.seq_record_step=0;self._seq_clock_count=0;self.status='REC — notes + selected parameter automation'
-  else:self.status='REC OFF'
-  self.redraw()
+  if self.seq_recording or self._seq_countin_job is not None:
+   if self._seq_countin_job is not None:
+    try:self.after_cancel(self._seq_countin_job)
+    except Exception:pass
+    self._seq_countin_job=None
+   self.seq_recording=False
+   if self.seq_playing:self.toggle_seq_play()
+   self.status='REC STOPPED';self.redraw();return
+  self.seq_record_step=0;self._seq_clock_count=0
+  bars=0 if self.seq_count_in=='OFF' else int(self.seq_count_in.split()[0]);self._seq_countin_left=bars*4
+  if self._seq_countin_left:self.status=f'COUNT-IN {self.seq_count_in}';self._seq_countin_tick()
+  else:self._begin_seq_record_now()
  def _record_note(self,note,velocity):
   if not self.seq_recording:return
   idx=max(0,min(63,int(self.seq_record_step)));st=self.preset.sequence.steps[idx]
@@ -2479,6 +2652,7 @@ class App(tk.Tk):
   if self._seq_clock_count>=6:
    self._seq_clock_count=0;ln=max(1,min(64,int(self.preset.sequence.length)));self.seq_record_step=(self.seq_record_step+1)%ln;self.selected_seq_step=self.seq_record_step;self.seq_hscroll=min(48,(self.selected_seq_step//16)*16)
    if self.seq_playing:self._play_seq_step(self.seq_record_step)
+   if self.seq_metronome and self.seq_playing and self.seq_record_step%4==0:self._seq_click(self.seq_record_step%16==0)
    self.redraw()
  def _song_cell(self,i):
   if self.song_mode=='SONG':
@@ -2815,4 +2989,3 @@ class App(tk.Tk):
    new_n=max(1,min(256,int(self._rx_bank)*128+(data[1]&127)+1));changed=(self.preset_source!='HARDWARE' or self.hardware_selected!=new_n);self.preset.number=new_n;self.hardware_selected=new_n;self.preset_source='HARDWARE';self._set_hardware_sequence_unavailable(reset=changed);self._schedule_hardware_refresh(self.preset.number);self.status=f'RX Program {self.preset.number:03d} — reading state / sequence unavailable';self.redraw()
 
 if __name__=='__main__':App().mainloop()
-

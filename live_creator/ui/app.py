@@ -2,6 +2,11 @@
 from pathlib import Path
 import math,time,sys
 import tkinter as tk
+try:
+    from PIL import Image,ImageDraw,ImageTk
+    PIL_OK=True
+except Exception:
+    PIL_OK=False
 from tkinter import filedialog,font as tkfont
 from live_creator.core.session import Session,Song,Transport,Loop,color_for
 from live_creator.core.clipboard import Clipboard
@@ -11,7 +16,7 @@ from live_creator.ui.popups import ObjectMenu,ColorPalette,MarkerPrompt,contrast
 from live_creator.ui.layout import Slots,pulse,clipped,wrapped
 from live_creator.core import state
 from live_creator.devices.uno.library import PresetLibrary,children,default_root
-from live_creator.ui.controls import Button,Dropdown,Scrollbar
+from live_creator.ui.controls import Button,TransportButton,Dropdown,Scrollbar
 from live_creator.ui.theme import BG,PANEL,PANEL2,EDGE,TEXT,MUTED,ORANGE
 import ui_theme
 
@@ -52,7 +57,7 @@ class LiveCreator(tk.Frame):
         self.grid_canvas.bind('<Configure>',lambda e:self.render_grid());self.grid_canvas.bind('<Button-1>',self.pad_click)
         self.grid_canvas.bind('<Button-3>',self.song_menu)
         self.name=tk.StringVar();self.tempo=tk.StringVar();self.song_length=tk.StringVar();self.metrics=tk.StringVar();self.current=tk.StringVar()
-        self.play_button=Button(self.work,'PLAY',self.toggle_play,width=222,height=38);self.play_button.pack(padx=16,pady=(16,12))
+        self.play_button=TransportButton(self.work,'PLAY',self.toggle_play,width=145,height=48);self.play_button.pack(padx=16,pady=(16,12))
         delay_row=tk.Frame(self.work,bg=PANEL);delay_row.pack(fill='x',padx=16,pady=4)
         tk.Label(delay_row,text='PLAY DELAY',bg=PANEL,fg=MUTED,font=('Segoe UI',10)).pack(side='left')
         self.delay=Dropdown(delay_row,list(DELAY),self.edit_delay);self.delay.configure(width=105);self.delay.pack(side='right')
@@ -84,7 +89,6 @@ class LiveCreator(tk.Frame):
         for name,key in mapping.items():
             value=ui_theme.TOKENS[ui_theme.current][key]
             globals()[name]=value;setattr(controls,name,value);setattr(popups,name,value)
-        ui_theme.recolor_widgets(self,'dark' if ui_theme.current=='light' else 'light')
         self.populate();self.render()
     @property
     def model(self):return self.session.song.timeline
@@ -93,14 +97,36 @@ class LiveCreator(tk.Frame):
     def entry(self,label,variable):
         parent=self.work
         if label=='TEMPO':parent=tk.Frame(self.work,bg=PANEL);parent.pack(fill='x',padx=16,pady=12)
-        tk.Label(parent,text=label,bg=PANEL,fg=MUTED,font=('Segoe UI',10)).pack(**({'side':'left'} if label=='TEMPO' else {'anchor':'w','padx':16,'pady':(12,4)}))
-        e=tk.Entry(parent,textvariable=variable,width=3,bg=PANEL2,fg=TEXT,insertbackground=ORANGE,relief='flat',highlightthickness=1,highlightbackground=EDGE,highlightcolor=ORANGE,font=('Segoe UI',11));e.pack(**({'side':'left','padx':8} if label=='TEMPO' else {'fill':'x','padx':10}))
+        if label!='NAME':tk.Label(parent,text=label,bg=PANEL,fg=MUTED,font=('Segoe UI',10)).pack(**({'side':'left'} if label=='TEMPO' else {'anchor':'w','padx':16,'pady':(12,4)}))
+        e=tk.Entry(parent,textvariable=variable,width=3,bg=PANEL2,fg=TEXT,insertbackground=TEXT,relief='flat',highlightthickness=1,highlightbackground=EDGE,highlightcolor='#c9ced1',font=('Segoe UI',11));e.pack(**({'side':'left','padx':8} if label=='TEMPO' else {'fill':'x','padx':0,'pady':(12,2),'ipady':6}))
         if label=='NAME':self.name_entry=e;e.configure(justify='center')
         if label=='TEMPO':
             e.bind('<Return>',self.edit_tempo);e.bind('<FocusOut>',self.edit_tempo)
             tk.Label(parent,text='LENGTH',bg=PANEL,fg=MUTED,font=('Segoe UI',10)).pack(side='left')
-            length=tk.Entry(parent,textvariable=self.song_length,width=3,bg=PANEL2,fg=TEXT,insertbackground=ORANGE,relief='flat',font=('Segoe UI',11));length.pack(side='left',padx=4)
-            length.bind('<Return>',self.edit_length);length.bind('<FocusOut>',self.edit_length)
+            self.length_button=Button(parent,self.song_length.get() or '64',self.open_length_palette,width=48,height=28);self.length_button.pack(side='left',padx=4)
+    def open_length_palette(self):
+        # 8x8 numeric palette matching ColorPalette, but in a smaller footprint.
+        cell_w,cell_h=20,16;cols=8;rows=8;ww=cols*cell_w+2;wh=rows*cell_h+2
+        win=tk.Toplevel(self);win.withdraw();win.overrideredirect(True);win.configure(bg=EDGE);win.resizable(False,False);win.transient(self.winfo_toplevel())
+        try:win.attributes('-topmost',True)
+        except Exception:pass
+        c=tk.Canvas(win,width=ww-2,height=wh-2,bg=PANEL2,highlightthickness=1,highlightbackground=EDGE);c.pack();cur=int(self.session.song.length)
+        for i in range(64):
+            n=i+1;r=i//8;col=i%8;x=1+col*cell_w;y=1+r*cell_h;sel=n<=cur
+            c.create_rectangle(x+2,y+2,x+cell_w-2,y+cell_h-2,fill=('#343a3f' if sel else PANEL2),outline=('#c9ced1' if sel else EDGE),width=1)
+            c.create_text(x+cell_w/2,y+cell_h/2,text=str(n),fill=('#c9ced1' if sel else TEXT),font=('Segoe UI',7))
+        def pick(ev):
+            col=int((ev.x-1)//cell_w);row=int((ev.y-1)//cell_h)
+            if 0<=col<8 and 0<=row<8:self.choose_length(row*8+col+1,win)
+        c.bind('<Button-1>',pick);win.update_idletasks()
+        try:x=self.length_button.winfo_rootx()+self.length_button.winfo_width()+4;y=self.length_button.winfo_rooty()
+        except Exception:x=self.winfo_pointerx();y=self.winfo_pointery()
+        sw,sh=win.winfo_screenwidth(),win.winfo_screenheight();x=max(0,min(int(x),sw-ww));y=max(0,min(int(y),sh-wh));win.geometry(f'{ww}x{wh}+{x}+{y}');win.deiconify();win.lift();win.grab_set();win.focus_force();win.bind('<Escape>',lambda e:win.destroy())
+    def choose_length(self,n,win=None):
+        self.session.song.set_length(n);self.song_length.set(str(n));self.length_button.set(str(n),False);self.status.set('');self.persist();self.render()
+        if win:
+            try:win.destroy()
+            except Exception:pass
     def edit_length(self,event=None):
         try:self.session.song.set_length(self.song_length.get());self.status.set('');self.persist()
         except ValueError as error:self.status.set(str(error))
@@ -117,6 +143,7 @@ class LiveCreator(tk.Frame):
         self.popup=ColorPalette(self,color,apply,x,y)
     def sync_editor(self):
         self.syncing=True;self.name.set(self.session.song.name);self.tempo.set(str(self.model.tempo));self.song_length.set(str(self.session.song.length));value=next(k for k,v in DELAY.items() if v==self.session.song.delay);self.delay.choice=value;self.delay.set(value+'  ▾');self.syncing=False
+        if hasattr(self,'length_button'):self.length_button.set(str(self.session.song.length),False)
     def edit_name(self,*args):
         if self.syncing:return
         self.session.song.name=self.name.get()[:256];self.persist();self.render_grid()
@@ -174,7 +201,17 @@ class LiveCreator(tk.Frame):
     def set_root(self,folder):self.root_folder=folder;self.expanded=set();self.browser_selected=None;self.populate()
     def populate(self):
         self.tree.delete('all');self.browser_rows=[]
-        if self.browser_mode.choice=='HARDWARE PRESETS':self.tree.create_text(12,22,text='UNO not connected',anchor='w',fill=MUTED);return
+        if self.browser_mode.choice=='HARDWARE PRESETS':
+            host=self.master
+            names=getattr(host,'hardware_names',{}) if host is not None else {}
+            current=int(getattr(host,'hardware_selected',1)) if host is not None else 1
+            self.browser_rows=[(('HW',n),0) for n in range(1,257)]
+            for i,((_,n),depth) in enumerate(self.browser_rows):
+                y=14+i*27;name=(names.get(n,'') or ('CURRENT' if n==current else '—'))
+                if n==current:self.tree.create_rectangle(4,y-12,238,y+12,fill=PANEL2,outline='#c9ced1',width=1)
+                self.tree.create_text(7,y,text=f'{n:03d}',anchor='w',fill='#c9ced1' if n==current else MUTED,font=('Segoe UI',9))
+                self.tree.create_text(48,y,text=clipped(name,180,self.small_font),anchor='w',fill=TEXT if name!='—' else MUTED,font=self.small_font)
+            self.tree.configure(scrollregion=(0,0,240,256*27));return
         def walk(folder,depth):
             for path in children(folder):
                 self.browser_rows.append((path,depth))
@@ -194,6 +231,10 @@ class LiveCreator(tk.Frame):
         self.source=None;i=int(self.tree.canvasy(event.y)//27)
         if not 0<=i<len(self.browser_rows):return
         path,depth=self.browser_rows[i];self.browser_selected=path
+        if isinstance(path,tuple) and path and path[0]=='HW':
+            n=int(path[1]);host=self.master
+            if host is not None and hasattr(host,'_select_hw_preset'):host._select_hw_preset(n)
+            self.source=None;self.populate();return
         if path.is_dir():
             if path in self.expanded:self.expanded.remove(path)
             else:self.expanded.add(path)
@@ -389,21 +430,45 @@ class LiveCreator(tk.Frame):
         if self.session.loop_state==Loop.ACTIVE:text='PLAY'
         if self.session.pending_pad is not None:text+=f' · {max(0,math.ceil(self.session.deadline-now))} s'
         self.play_button.set(text,self.session.active)
-        self.name_entry.configure(bg=self.session.song.color,fg=contrast(self.session.song.color),insertbackground=contrast(self.session.song.color))
+        name_bg=self.session.song.color or PANEL2
+        self.name_entry.configure(bg=name_bg,fg=contrast(name_bg),insertbackground=contrast(name_bg))
         self.marker_list.delete('all')
         for i,(step,label) in enumerate(sorted(self.model.markers.items())):
             self.marker_list.create_text(4,i*22+11,text=f'{step:02d}   '+clipped(label,165,self.small_font),anchor='w',fill=TEXT,font=self.small_font)
         self.marker_list.configure(scrollregion=(0,0,200,len(self.model.markers)*22))
+    @staticmethod
+    def _shade(color,f):
+        c=color.lstrip('#');v=[int(c[i:i+2],16) for i in (0,2,4)];return '#'+''.join(f'{max(0,min(255,round(n*f))):02x}' for n in v)
+    def _pad_surface(self,c,x,y,size,color,outline,width=1):
+        # Dark pad surface. Song colour belongs to the outline only. Supersampled AA removes pixel-stepped corners.
+        if PIL_OK:
+            try:
+                ss=4;W=max(8,int(size*ss));H=W;r=max(10,int(size*.075*ss));base='#1b2024';br=[int(base[i:i+2],16) for i in (1,3,5)]
+                img=Image.new('RGBA',(W,H),(0,0,0,0));mask=Image.new('L',(W,H),0);ImageDraw.Draw(mask).rounded_rectangle((1,1,W-2,H-2),radius=r,fill=255)
+                grad=Image.new('RGBA',(W,H),(0,0,0,0));gd=ImageDraw.Draw(grad)
+                cx=cy=(W-1)/2;maxd=(cx*cx+cy*cy)**.5
+                for yy in range(H):
+                    # radial edge-light / centre-dark gradient
+                    d=abs(yy-cy)/max(1,cy);f=.94+.08*d;col=tuple(max(0,min(255,round(v*f))) for v in br)+(255,);gd.line((0,yy,W,yy),fill=col)
+                grad.putalpha(mask);img.alpha_composite(grad);dr=ImageDraw.Draw(img);ow=max(1,int(width*ss));dr.rounded_rectangle((ow//2,ow//2,W-1-ow//2,H-1-ow//2),radius=r,outline=outline,width=ow)
+                img=img.resize((max(2,int(size)),max(2,int(size))),Image.Resampling.LANCZOS);ph=ImageTk.PhotoImage(img)
+                if not hasattr(self,'_pad_images'):self._pad_images=[]
+                self._pad_images.append(ph);c.create_image(x,y,image=ph,anchor='nw');return
+            except Exception:pass
+        self.round_block(c,x,y,x+size,y+size,fill='#1b2024',outline=outline,width=width)
     def render_grid(self):
-        c=self.grid_canvas;c.delete('all');self.pad_boxes=[];side=max(80,min(c.winfo_width()-24,c.winfo_height()-12));pitch=side/8;size=pitch*.88;left=(c.winfo_width()-side)/2
+        c=self.grid_canvas;c.delete('all');self._pad_images=[];self.pad_boxes=[];side=max(80,min(c.winfo_width()-24,c.winfo_height()-12));pitch=side/8;size=pitch*.88;left=(c.winfo_width()-side)/2
         for i,song in enumerate(self.session.pads):
             x=left+(i%8)*pitch;y=6+(i//8)*pitch;self.pad_boxes.append((i,x,y,size));selected=i==self.session.selected;playing=i==self.session.playing_pad
-            color=song.color if song.timeline.length else '#1b2024'
-            if playing:color=pulse(color,time.monotonic())
-            c.create_rectangle(x,y,x+size,y+size,fill=color,outline=ORANGE if selected else EDGE,width=2 if selected else 1,tags=f'pad-{i}')
+            color=song.color if song.timeline.length else EDGE
+            if playing:edge=color if int(time.monotonic()*3)%2==0 else self._shade(color,.55);ew=2
+            elif song.timeline.length:edge=color;ew=2
+            elif selected:edge='#c9ced1';ew=2
+            else:edge=EDGE;ew=1
+            self._pad_surface(c,x,y,size,'#1b2024',edge,ew)
             if song.timeline.length:
                 text=wrapped(song.name,size-10,max(1,int((size-12)/self.pad_font.metrics('linespace'))),self.pad_font)
-                c.create_text(x+size/2,y+size/2-2,text=text,justify='center',fill='#101417' if playing else contrast(color),font=self.pad_font,tags=f'pad-label-{i}')
+                c.create_text(x+size/2,y+size/2-2,text=text,justify='center',fill=TEXT,font=self.pad_font,tags=f'pad-label-{i}')
             else:c.create_text(x+size/2,y+size/2,text=f'{i+1:02d}',fill=MUTED,font=self.small_font,tags=f'pad-label-{i}')
     @staticmethod
     def round_block(canvas,x,y,x2,y2,**options):

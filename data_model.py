@@ -20,6 +20,10 @@ class Sequence:
     @property
     def can_duplicate(self):
         return self.length_confirmed and 1<=self.length<=32 and (not self.native_automation or self.native_automation.get('entry_count')==0)
+    @property
+    def can_duplicate_to_next_bar(self):
+        # Unlike legacy duplicate(), this operation may grow Sequence Length itself.
+        return self.length_confirmed and self.length<64 and any(step.notes for step in self.steps[:min(64,self.length)])
     def duplicate(self):
         n=self.length
         if not self.can_duplicate:raise ValueError('Dupl requires Length 1..32 and decoded Step Automation; native mapping PARTIAL')
@@ -31,6 +35,22 @@ class Sequence:
                     while len(values)<64:values.append(None)
                     values[n:n*2]=copy.deepcopy(values[:n])
         self.length=n*2
+    def duplicate_to_next_bar(self,steps_per_bar):
+        if not self.can_duplicate_to_next_bar:raise ValueError('Dupl requires notes and room up to 64 steps')
+        bar=max(1,int(steps_per_bar))
+        last_note=next((i for i in range(min(64,self.length,len(self.steps))-1,-1,-1) if self.steps[i].notes),None)
+        if last_note is None:raise ValueError('Dupl requires at least one note')
+        source_len=((last_note//bar)+1)*bar
+        if source_len>=64:raise ValueError('No next bar available for duplicate')
+        copy_len=min(source_len,64-source_len)
+        self.steps[source_len:source_len+copy_len]=copy.deepcopy(self.steps[:copy_len])
+        for lane in self.automation:
+            for key in ('values','fine_values','cc_values'):
+                if key in lane:
+                    values=lane[key]
+                    while len(values)<64:values.append(None)
+                    values[source_len:source_len+copy_len]=copy.deepcopy(values[:copy_len])
+        self.length=max(self.length,min(64,source_len+copy_len))
     def fill64(self,source_len=None):
         n=max(1,min(64,int(source_len or self.length or 1))); base=[Step(**asdict(x)) for x in self.steps[:n]]
         for i in range(64): self.steps[i]=Step(**asdict(base[i%n]))

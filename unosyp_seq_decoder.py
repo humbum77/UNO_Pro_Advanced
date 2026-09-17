@@ -16,7 +16,7 @@ File sequencer area:
 Each 196-byte page:
     +0..+1     2-byte page header
     +2..+185   184-byte 7-bit packed sequence block
-    +186..+195 10-byte page metadata (opaque/preserved)
+    +186..+195 10-byte page metadata (preserved; confirmed Gate/ACC/TIE maps)
 
 The 184-byte sequence block contains 1288 stored bits.
 Read every stored byte as a 7-bit value, LSB-first, concatenate the bits,
@@ -25,7 +25,7 @@ discard the first 6 padding bits, then read 160 bytes LSB-first:
     160 bytes = 16 steps * 10 bytes
 
 Each decoded 10-byte step record:
-    +0 control / flags byte          (semantic bits not fully mapped)
+    +0 control / flags byte          (preserved raw)
     +1 Note 1
     +2 Velocity 1
     +3 Extra 1                      (meaning not yet confirmed)
@@ -39,7 +39,8 @@ Each decoded 10-byte step record:
 0xFF in a note slot means unused/empty voice.
 
 This decoder is READ-ONLY. It does not modify presets or send MIDI/SysEx.
-Unknown control bits, Extra fields, headers and metadata remain opaque.
+Unknown control bits, Extra fields and headers remain opaque.
+Gate, Accent and Tie are decoded read-only from the confirmed page maps.
 
 The 1084-byte EMPTY/test5 variant produced by the official editor is
 deliberately NOT treated as equivalent because controlled testing showed
@@ -125,7 +126,43 @@ def unpack_page_sequence(packed: bytes) -> bytes:
     return bytes(raw)
 
 
-def decode_step_record(record: bytes, global_step: int) -> Dict[str, Any]:
+def _packed7_value(data: bytes) -> int:
+    """Combine consecutive 7-bit bytes, least-significant group first."""
+    return sum((value & 0x7F) << (7 * index) for index, value in enumerate(data))
+
+
+def decode_gate_accent_values(data: bytes = b'', page0_payload: bytes = b'') -> tuple[int, int]:
+    """Decode the shared sequencer Gate/Accent values from file or 0x29 page 0.
+
+    The 293-byte hardware page-0 payload is the file state range [4:297], so
+    file offsets 209/210/212 correspond to payload offsets 205/206/208.
+    """
+    if page0_payload:
+        source = bytes(page0_payload)
+        if len(source) != 293:
+            raise ValueError(f'0x29 page 0 must be 293 bytes, got {len(source)}')
+        gate_raw = source[205] | (source[206] << 7)
+        accent_raw = source[208]
+    else:
+        source = bytes(data)
+        if len(source) < 213:
+            raise ValueError('truncated Gate/Accent state')
+        gate_raw = source[209] | (source[210] << 7)
+        accent_raw = source[212]
+    gate_float = (gate_raw - 16) / 32.0
+    gate_value = 0 if gate_raw == 16 else int(gate_float + 0.5)
+    return max(0, min(10, gate_value)), max(0, min(127, int(accent_raw)))
+
+
+def decode_step_record(
+    record: bytes,
+    global_step: int,
+    gate_enabled: bool = False,
+    accent_enabled: bool = False,
+    tie_enabled: bool = False,
+    gate_value: int = 0,
+    accent_value: int = 0,
+) -> Dict[str, Any]:
     if len(record) != STEP_SIZE:
         raise ValueError(f"step record must be {STEP_SIZE} bytes")
 
@@ -151,6 +188,9 @@ def decode_step_record(record: bytes, global_step: int) -> Dict[str, Any]:
     return {
         "step": global_step,
         "control_raw": record[0],
+        "gate": gate_value if gate_enabled else 0,
+        "accent": accent_value if accent_enabled else 0,
+        "tie": bool(tie_enabled),
         "record_hex": record.hex(" "),
         "active": bool(active),
         "notes": active,
@@ -158,7 +198,13 @@ def decode_step_record(record: bytes, global_step: int) -> Dict[str, Any]:
     }
 
 
-def parse_page(page: bytes, page_index: int, file_offset: int) -> Dict[str, Any]:
+def parse_page(
+    page: bytes,
+    page_index: int,
+    file_offset: int,
+    gate_value: int = 0,
+    accent_value: int = 0,
+) -> Dict[str, Any]:
     if len(page) != PAGE_SIZE:
         raise ValueError(f"page must be {PAGE_SIZE} bytes")
 
@@ -167,12 +213,35 @@ def parse_page(page: bytes, page_index: int, file_offset: int) -> Dict[str, Any]
     metadata = page[PAGE_HEADER_SIZE + PACKED_SIZE:]
     raw = unpack_page_sequence(packed)
 
+    # Confirmed by REF C2 G1/G7/G10, A1/A27/A127 and DUA BASS A2.
+    # The maps are 16 page-local step bits in packed 7-bit metadata.
+    gate_map = (_packed7_value(page[188:191]) >> 8) & 0xFFFF
+    accent_map = (_packed7_value(page[190:193]) >> 10) & 0xFFFF
+    # Confirmed by TIE1ON/TIE2ON: 0x20 -> Step 1, 0x40 -> Step 2.
+    tie_map = (_packed7_value(page[193:196]) >> 5) & 0xFFFF
+    # Packed fields overlap at the storage-bit level. A zero global value
+    # means the corresponding step map is semantically inactive; clearing it
+    # prevents an ACC-only Step 1 capture from appearing as Gate automation.
+    if gate_value == 0:
+        gate_map = 0
+    if accent_value == 0:
+        accent_map = 0
+
     steps = []
     for local_step in range(STEPS_PER_PAGE):
         start = local_step * STEP_SIZE
         record = raw[start:start + STEP_SIZE]
         global_step = page_index * STEPS_PER_PAGE + local_step + 1
-        steps.append(decode_step_record(record, global_step))
+        mask = 1 << local_step
+        steps.append(decode_step_record(
+            record,
+            global_step,
+            gate_enabled=bool(gate_map & mask),
+            accent_enabled=bool(accent_map & mask),
+            tie_enabled=bool(tie_map & mask),
+            gate_value=gate_value,
+            accent_value=accent_value,
+        ))
 
     return {
         "page": page_index + 1,
@@ -181,18 +250,44 @@ def parse_page(page: bytes, page_index: int, file_offset: int) -> Dict[str, Any]
         "header_hex": header.hex(" "),
         "packed_hex": packed.hex(" "),
         "metadata_hex": metadata.hex(" "),
+        "gate_step_map": gate_map,
+        "accent_step_map": accent_map,
+        "tie_step_map": tie_map,
         "raw_hex": raw.hex(" "),
         "steps": steps,
     }
 
 
+def parse_payload_page(
+    payload: bytes,
+    page_index: int,
+    gate_value: int = 0,
+    accent_value: int = 0,
+    file_offset: int = 0,
+) -> Dict[str, Any]:
+    """Decode the shared page core used by variable `.unosyp` and SysEx 0x29."""
+    payload = bytes(payload)
+    if len(payload) < 192:
+        raise ValueError(f'sequence page payload must be at least 192 bytes, got {len(payload)}')
+    core = b'\x00\x00' + payload[:182] + b'\x00\x00' + payload[182:192]
+    page = parse_page(core, page_index, file_offset, gate_value, accent_value)
+    page['payload_size'] = len(payload)
+    page['extension_hex'] = payload[192:].hex(' ')
+    return page
+
+
 def parse_unosyp(data: bytes) -> Dict[str, Any]:
+    # Confirmed global values paired with the page-local step maps.
+    # Gate controls: 0/1/7/10. ACC controls: 0/1/27/127.
+    gate_value, accent_value = decode_gate_accent_values(data=data)
     result: Dict[str, Any] = {
         "size": len(data),
         "expected_size": EXPECTED_SIZE,
         "supported_sequence_variant": False,
         "sequence_start": SEQ_START,
         "pages": [],
+        "gate_value": gate_value,
+        "accent_value": accent_value,
     }
     from native_automation import read_automation,sequence_length
     try:result['native_automation']=read_automation(data)
@@ -209,7 +304,9 @@ def parse_unosyp(data: bytes) -> Dict[str, Any]:
         result['supported_sequence_variant'] = True
         for page_index in range(PAGE_COUNT):
             po = SEQ_START + page_index * PAGE_SIZE
-            result['pages'].append(parse_page(data[po:po+PAGE_SIZE], page_index, po))
+            result['pages'].append(parse_page(
+                data[po:po+PAGE_SIZE], page_index, po, gate_value, accent_value
+            ))
         result['steps']=[s for p in result['pages'] for s in p['steps']]
         result['active_steps']=[s['step'] for s in result['steps'] if s['active']]
         return result
@@ -219,11 +316,9 @@ def parse_unosyp(data: bytes) -> Dict[str, Any]:
             size = int.from_bytes(data[offset:offset+4], 'little'); offset += 4
             if size < 192 or size > 65535 or offset + size > len(data): raise ValueError('invalid page length')
             payload = data[offset:offset+size]; offset += size
-            # The legacy file decoder expects a 184-byte packed field; the
-            # hardware/file core stores 182 packed bytes plus ten metadata bytes.
-            core = b'\x00\x00' + payload[:182] + b'\x00\x00' + payload[182:192]
-            page = parse_page(core, page_index, offset-size-4)
-            page['payload_size']=size; page['extension_hex']=payload[192:].hex(' ')
+            page = parse_payload_page(
+                payload, page_index, gate_value, accent_value, offset-size-4
+            )
             result['pages'].append(page)
     except ValueError as exc:
         result['warning']=f'Invalid variable-length sequence pages: {exc}'
@@ -280,7 +375,8 @@ def print_summary(info: Dict[str, Any], show_all: bool = False, show_raw: bool =
             payload = "; ".join(note_text) if note_text else "EMPTY"
             print(
                 f"  Step {step['step']:02d}: "
-                f"control=0x{step['control_raw']:02X} | {payload}"
+                f"control=0x{step['control_raw']:02X} | "
+                f"gate={step['gate']} acc={step['accent']} tie={step['tie']} | {payload}"
             )
 
             if show_all:

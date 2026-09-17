@@ -138,6 +138,9 @@ def load_binary_unosyp_sequence(path):
             extras.append(int(voice.get('extra_raw',255))&0xFF)
         st=seq.steps[idx];st.notes=notes;st.note_velocities=vels;st.note_extras=extras
         st.control_raw=int(decoded.get('control_raw',0))&0xFF
+        st.gate=max(0,min(10,int(decoded.get('gate',0))))
+        st.accent=max(0,min(127,int(decoded.get('accent',0))))
+        st.tie=bool(decoded.get('tie',False))
         if vels:st.velocity=vels[0]
         if notes:active_last=idx+1
     try:seq.length=sequence_length(raw)

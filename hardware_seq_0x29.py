@@ -10,7 +10,8 @@ Confirmed from official Editor capture + DFU comparison:
 
 No write/store operation is implemented here.
 """
-from typing import Dict,List,Optional,Any
+from typing import Dict,Any
+from unosyp_seq_decoder import decode_gate_accent_values,parse_payload_page
 
 RESPONSE_PREFIX=bytes([0xF0,0x00,0x21,0x1A,0x02,0x03,0x00,0x29])
 PAGE_PAYLOAD_SIZE=192
@@ -30,40 +31,28 @@ def parse_0x29_response(data:bytes,expected_slot=None):
     if expected is None or (page==0 and len(payload)!=expected) or (1<=page<=4 and not (expected<=len(payload)<=MAX_PAGE_PAYLOAD_SIZE)):return None
     return page,payload
 
-def _unpack_tail(payload:bytes)->bytes:
-    if len(payload)<PAGE_PAYLOAD_SIZE:raise ValueError(f'0x29 sequence page must be at least 192 bytes, got {len(payload)}')
-    bits=[]
-    for b in payload[:PACKED_SIZE]:
-        v=b&0x7F
-        bits.extend((v>>i)&1 for i in range(7))
-    bits=bits[:159*8]
-    out=bytearray()
-    for pos in range(0,len(bits),8):
-        v=0
-        for i,bit in enumerate(bits[pos:pos+8]):v|=(bit&1)<<i
-        out.append(v)
-    return bytes(out)
-
 def decode_pages(pages:Dict[int,bytes])->Dict[str,Any]:
-    missing=[p for p in range(1,5) if p not in pages]
+    missing=[p for p in range(0,5) if p not in pages]
     if missing:raise ValueError(f'missing 0x29 sequence pages: {missing}')
-    steps=[];metadata=[]
+    gate_value,accent_value=decode_gate_accent_values(page0_payload=pages[0])
+    steps=[];metadata=[];decoded_pages=[]
     for page in range(1,5):
         payload=bytes(pages[page])
         if len(payload)<PAGE_PAYLOAD_SIZE:raise ValueError(f'page {page}: expected at least 192 bytes, got {len(payload)}')
-        logical:[Optional[int]]=[None]+list(_unpack_tail(payload))
-        metadata.append(payload[PACKED_SIZE:].hex(' '))
-        for local in range(STEPS_PER_PAGE):
-            rec=logical[local*STEP_SIZE:(local+1)*STEP_SIZE]
+        decoded=parse_payload_page(payload,page-1,gate_value,accent_value)
+        decoded_pages.append(decoded);metadata.append(decoded['metadata_hex'])
+        for item in decoded['steps']:
             notes=[];vels=[];extras=[]
-            for voice in range(3):
-                base=1+voice*3;note=rec[base];vel=rec[base+1];extra=rec[base+2]
-                if note is None or vel is None or extra is None:raise ValueError('unexpected incomplete note tuple')
-                if note!=0xFF and 0<=note<=127:
-                    notes.append(note);vels.append(vel&0x7F);extras.append(extra&0xFF)
-            steps.append({'step':(page-1)*16+local+1,'control_raw':rec[0],
-                          'notes':notes,'note_velocities':vels,'note_extras':extras})
-    return {'steps':steps,'metadata':metadata,'unknown_control_steps':[1,17,33,49]}
+            for voice in item['voices']:
+                if voice['empty']:continue
+                note=voice['note_raw']
+                if 0<=note<=127:
+                    notes.append(note);vels.append(voice['velocity']&0x7F);extras.append(voice['extra_raw']&0xFF)
+            steps.append({'step':item['step'],'control_raw':item['control_raw'],
+                          'notes':notes,'note_velocities':vels,'note_extras':extras,
+                          'gate':item['gate'],'accent':item['accent'],'tie':item['tie']})
+    return {'steps':steps,'metadata':metadata,'pages':decoded_pages,
+            'gate_value':gate_value,'accent_value':accent_value}
 
 def apply_to_sequence(sequence,pages:Dict[int,bytes]):
     info=decode_pages(pages);active_last=0
@@ -71,6 +60,9 @@ def apply_to_sequence(sequence,pages:Dict[int,bytes]):
         idx=item['step']-1;st=sequence.steps[idx]
         st.notes=list(item['notes']);st.note_velocities=list(item['note_velocities']);st.note_extras=list(item['note_extras'])
         st.control_raw=item['control_raw']
+        st.gate=max(0,min(10,int(item.get('gate',0))))
+        st.accent=max(0,min(127,int(item.get('accent',0))))
+        st.tie=bool(item.get('tie',False))
         if st.note_velocities:st.velocity=st.note_velocities[0]
         if st.notes:active_last=idx+1
     sequence.length=max(16,active_last)
