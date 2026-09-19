@@ -1,4 +1,4 @@
-name: Build Protocol Lab Windows
+name: Build Protocol Lab Windows # capture-fix
 
 on:
   push:
