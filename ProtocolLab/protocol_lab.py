@@ -201,6 +201,7 @@ class ProtocolLab(tk.Tk):
         self.model = CaptureModel()
         self.rx_queue: queue.Queue[tuple[str, object]] = queue.Queue()
         self.inport = None
+        self.outport = None
         self.show_clock_var = tk.BooleanVar(value=False)
         self.experiment_mode = tk.StringVar(value="MANUAL — DEVICE")
         self.experiment_target = tk.StringVar(value="SEQ")
@@ -220,6 +221,8 @@ class ProtocolLab(tk.Tk):
         ttk.Button(top, text="Refresh", command=self.refresh_ports).pack(side="left")
         self.connect_btn = ttk.Button(top, text="Connect", command=self.toggle_connect)
         self.connect_btn.pack(side="left", padx=6)
+        ttk.Label(top, text="MIDI OUT:").pack(side="left", padx=(8,0))
+        self.out_var=tk.StringVar(); self.out_combo=ttk.Combobox(top,textvariable=self.out_var,width=28,state="readonly"); self.out_combo.pack(side="left",padx=4)
 
         ttk.Checkbutton(top, text="Show MIDI Clock (F8)", variable=self.show_clock_var).pack(side="left", padx=(10, 0))
 
@@ -235,7 +238,8 @@ class ProtocolLab(tk.Tk):
         for label in ("BASELINE", "SEQ_ON", "SEQ_OFF", "REC_ON", "REC_OFF"):
             ttk.Button(marker, text=label, command=lambda x=label: self.quick_mark(x)).pack(side="left", padx=(5, 0))
 
-        exp = ttk.LabelFrame(self, text="SEQ / REC State Investigator", padding=8)\n        exp.pack(fill="x", padx=8, pady=(0, 8))\n        ttk.Label(exp, text="Mode:").pack(side="left")\n        ttk.Combobox(exp, textvariable=self.experiment_mode, values=("AUTO", "MANUAL — DEVICE"), width=20, state="readonly").pack(side="left", padx=5)\n        ttk.Label(exp, text="Target:").pack(side="left", padx=(10,0))\n        ttk.Combobox(exp, textvariable=self.experiment_target, values=("SEQ","REC"), width=7, state="readonly").pack(side="left", padx=5)\n        ttk.Button(exp, text="Capture OFF", command=lambda:self.capture_experiment_state("OFF")).pack(side="left", padx=4)\n        ttk.Button(exp, text="Capture ON", command=lambda:self.capture_experiment_state("ON")).pack(side="left", padx=4)\n        ttk.Button(exp, text="Analyze", command=self.analyze_experiment).pack(side="left", padx=4)\n        ttk.Button(exp, text="Reset experiment", command=self.reset_experiment).pack(side="left", padx=4)\n        self.exp_status = tk.StringVar(value="Use physical UNO button in MANUAL mode; capture repeated OFF/ON states.")\n        ttk.Label(exp, textvariable=self.exp_status).pack(side="left", padx=10)\n\n        columns = ("time", "label", "kind", "cmd", "role", "shape", "len", "hex")
+        exp = ttk.LabelFrame(self, text="SEQ / REC State Investigator", padding=8)\n        exp.pack(fill="x", padx=8, pady=(0, 8))\n        ttk.Label(exp, text="Mode:").pack(side="left")\n        ttk.Combobox(exp, textvariable=self.experiment_mode, values=("AUTO", "MANUAL — DEVICE"), width=20, state="readonly").pack(side="left", padx=5)\n        ttk.Label(exp, text="Target:").pack(side="left", padx=(10,0))\n        ttk.Combobox(exp, textvariable=self.experiment_target, values=("SEQ","REC"), width=7, state="readonly").pack(side="left", padx=5)\n        ttk.Button(exp, text="Read 0x37", command=self.read_current_state).pack(side="left", padx=4)
+        ttk.Button(exp, text="Capture OFF", command=lambda:self.capture_experiment_state("OFF")).pack(side="left", padx=4)\n        ttk.Button(exp, text="Capture ON", command=lambda:self.capture_experiment_state("ON")).pack(side="left", padx=4)\n        ttk.Button(exp, text="Analyze", command=self.analyze_experiment).pack(side="left", padx=4)\n        ttk.Button(exp, text="Reset experiment", command=self.reset_experiment).pack(side="left", padx=4)\n        self.exp_status = tk.StringVar(value="Use physical UNO button in MANUAL mode; capture repeated OFF/ON states.")\n        ttk.Label(exp, textvariable=self.exp_status).pack(side="left", padx=10)\n\n        columns = ("time", "label", "kind", "cmd", "role", "shape", "len", "hex")
         self.tree = ttk.Treeview(self, columns=columns, show="headings")
         widths = {"time":75,"label":100,"kind":80,"cmd":65,"role":235,"shape":145,"len":55,"hex":500}
         for col in columns:
@@ -261,11 +265,12 @@ class ProtocolLab(tk.Tk):
             self.status_var.set(f"MIDI backend unavailable: {MIDI_BACKEND_ERROR}")
             return
         try:
-            names = mido.get_input_names()
+            names = mido.get_input_names(); out_names=mido.get_output_names()
         except Exception as exc:
             names = []
             self.status_var.set(f"MIDI backend error: {exc}")
         self.port_combo["values"] = names
+        self.out_combo["values"] = out_names if "out_names" in locals() else ()
         if not names:
             self.status_var.set("No MIDI IN ports found. Reconnect UNO, then Refresh.")
         else:
@@ -273,11 +278,13 @@ class ProtocolLab(tk.Tk):
         if names and self.port_var.get() not in names:
             pro = next((x for x in names if "UNO" in x.upper()), names[0])
             self.port_var.set(pro)
+        if "out_names" in locals() and out_names and self.out_var.get() not in out_names: self.out_var.set(next((x for x in out_names if "UNO" in x.upper()),out_names[0]))
 
     def toggle_connect(self) -> None:
         if self.inport is not None:
             self.inport.close()
             self.inport = None
+            if self.outport is not None: self.outport.close(); self.outport=None
             self.connect_btn.configure(text="Connect")
             self.status_var.set("Disconnected • READ ONLY")
             return
@@ -290,6 +297,7 @@ class ProtocolLab(tk.Tk):
             return
         try:
             self.inport = mido.open_input(name, callback=self._midi_callback)
+            if self.out_var.get(): self.outport=mido.open_output(self.out_var.get())
         except Exception as exc:
             messagebox.showerror("Protocol Lab", str(exc))
             return
@@ -335,7 +343,7 @@ class ProtocolLab(tk.Tk):
         if children:
             self.tree.see(children[-1])
 
-    def _latest_state_response(self):\n        for ev in reversed(self.model.events):\n            if ev.command == "0x37" and ev.shape == "RESPONSE-LIKE":\n                try: return parse_hex(ev.hex)\n                except ValueError: return None\n        return None\n\n    def capture_experiment_state(self, phase: str) -> None:\n        raw=self._latest_state_response()\n        if raw is None:\n            self.exp_status.set("No 0x37 response captured yet.")\n            return\n        self.experiment_snapshots[phase].append(raw)\n        self.quick_mark(f"{self.experiment_target.get()}_{phase}")\n        self.exp_status.set(f"{self.experiment_target.get()} {phase}: snapshot #{len(self.experiment_snapshots[phase])} captured.")\n\n    def analyze_experiment(self) -> None:\n        offs=self.experiment_snapshots["OFF"]; ons=self.experiment_snapshots["ON"]; n=min(len(offs),len(ons))\n        if not n:\n            self.exp_status.set("Need at least one OFF and one ON 0x37 snapshot.")\n            return\n        stable=stable_bit_changes([(offs[i],ons[i]) for i in range(n)])\n        if stable:\n            txt=", ".join(f"byte {o} mask 0x{m:02X} {int(a)}→{int(b)}" for o,m,a,b in stable[:12])\n            self.exp_status.set(f"Stable candidates ({n} cycle(s)): {txt}")\n        else: self.exp_status.set(f"No stable bit candidate across {n} cycle(s).")\n\n    def reset_experiment(self) -> None:\n        self.experiment_snapshots={"OFF":[],"ON":[]}\n        self.exp_status.set("Experiment reset. Capture repeated OFF/ON states.")\n\n    def set_marker(self) -> None:
+    def read_current_state(self) -> None:\n        if self.outport is None:\n            self.exp_status.set("Connect MIDI OUT first."); return\n        raw=bytes.fromhex("F0 00 21 1A 02 03 37 00 00 F7")\n        try:\n            self.outport.send(mido.Message.from_bytes(list(raw)))\n            self.exp_status.set("0x37 state read sent; waiting for response.")\n        except Exception as exc: self.exp_status.set(f"0x37 send error: {exc}")\n\n    def _latest_state_response(self):\n        for ev in reversed(self.model.events):\n            if ev.command == "0x37" and ev.shape == "RESPONSE-LIKE":\n                try: return parse_hex(ev.hex)\n                except ValueError: return None\n        return None\n\n    def capture_experiment_state(self, phase: str) -> None:\n        raw=self._latest_state_response()\n        if raw is None:\n            self.exp_status.set("No 0x37 response captured yet.")\n            return\n        self.experiment_snapshots[phase].append(raw)\n        self.quick_mark(f"{self.experiment_target.get()}_{phase}")\n        self.exp_status.set(f"{self.experiment_target.get()} {phase}: snapshot #{len(self.experiment_snapshots[phase])} captured.")\n\n    def analyze_experiment(self) -> None:\n        offs=self.experiment_snapshots["OFF"]; ons=self.experiment_snapshots["ON"]; n=min(len(offs),len(ons))\n        if not n:\n            self.exp_status.set("Need at least one OFF and one ON 0x37 snapshot.")\n            return\n        stable=stable_bit_changes([(offs[i],ons[i]) for i in range(n)])\n        if stable:\n            txt=", ".join(f"byte {o} mask 0x{m:02X} {int(a)}→{int(b)}" for o,m,a,b in stable[:12])\n            self.exp_status.set(f"Stable candidates ({n} cycle(s)): {txt}")\n        else: self.exp_status.set(f"No stable bit candidate across {n} cycle(s).")\n\n    def reset_experiment(self) -> None:\n        self.experiment_snapshots={"OFF":[],"ON":[]}\n        self.exp_status.set("Experiment reset. Capture repeated OFF/ON states.")\n\n    def set_marker(self) -> None:
         self.model.mark(self.label_var.get())
         self.status_var.set(f"Capture label = {self.model.current_label} • READ ONLY")
 
@@ -401,8 +409,8 @@ class ProtocolLab(tk.Tk):
             self.tree.delete(item)
 
     def destroy(self) -> None:
-        if self.inport is not None:
-            self.inport.close()
+        if self.inport is not None: self.inport.close()
+        if self.outport is not None: self.outport.close()
         super().destroy()
 
 
