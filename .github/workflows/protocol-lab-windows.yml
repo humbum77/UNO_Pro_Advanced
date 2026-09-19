@@ -4,12 +4,6 @@ on:
   push:
     branches:
       - "research/protocol-lab"
-    paths:
-      - "ProtocolLab/**"
-      - "tests/test_protocol_lab.py"
-      - "tests/test_unosyp_probe.py"
-      - "tests/test_state_investigator.py"
-      - ".github/workflows/protocol-lab-windows.yml"
   pull_request:
     paths:
       - "ProtocolLab/**"
