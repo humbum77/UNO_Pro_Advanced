@@ -26,8 +26,13 @@ except ImportError:  # UI can still open for offline analysis/import.
 IK_HEADER = (0xF0, 0x00, 0x21, 0x1A, 0x02, 0x03)
 SYSEX_END = 0xF7
 
+# Research candidate inherited from the original UNO Synth protocol.
+# This is deliberately NOT sent automatically and is NOT a Pro confirmation.
+LEGACY_SEQUENCE_STATE_CANDIDATE = bytes.fromhex("F0 00 21 1A 02 03 14 F7")
+
 # Only roles supported by project evidence. Unknown IDs stay UNKNOWN.
 KNOWN_COMMANDS = {
+    0x14: "LEGACY SEQUENCE STATE CANDIDATE — PRO UNVERIFIED",
     0x24: "PRESET NAME/INFO",
     0x28: "BULK PRESET WRITE / STORE — LOCKED",
     0x29: "PRESET/SEQUENCE PAGE READ",
