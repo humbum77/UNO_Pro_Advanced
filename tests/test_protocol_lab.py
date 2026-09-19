@@ -26,6 +26,13 @@ class ProtocolLabParserTests(unittest.TestCase):
         self.assertTrue(lab.is_current_state_response(raw))
         self.assertFalse(lab.is_current_state_response(raw[:-1]))
 
+    def test_captured_device_event_commands_are_catalogued_without_semantic_guess(self):
+        for cmd in (0x27, 0x34):
+            raw = bytes([0xF0,0x00,0x21,0x1A,0x02,0x03,cmd,0x00,0xF7])
+            p = lab.parse_ik_sysex(raw)
+            self.assertEqual(p.command, cmd)
+            self.assertIn("UNCONFIRMED", p.role)
+
     def test_unknown_stays_unknown(self):
         raw = bytes.fromhex("F0 00 21 1A 02 03 55 01 F7")
         p = lab.parse_ik_sysex(raw)
