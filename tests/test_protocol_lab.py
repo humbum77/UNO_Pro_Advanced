@@ -49,6 +49,13 @@ class ProtocolLabParserTests(unittest.TestCase):
         unique = m.unique_payloads("OFF", "ON")
         self.assertEqual(unique, [("0x37", "00 00 05")])
 
+    def test_transport_bytes_are_preserved_exactly(self):
+        m = lab.CaptureModel()
+        for raw in (b"\xF8", b"\xFA", b"\xFB", b"\xFC"):
+            ev = m.add_bytes(raw, "MIDI TRANSPORT")
+            self.assertEqual(ev.hex, lab.bytes_to_hex(raw))
+            self.assertEqual(ev.length, 1)
+
     def test_legacy_sequence_state_candidate_is_catalog_only(self):
         p = lab.parse_ik_sysex(lab.LEGACY_SEQUENCE_STATE_CANDIDATE)
         self.assertEqual(p.command, 0x14)
