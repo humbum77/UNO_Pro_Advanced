@@ -99,3 +99,23 @@ Until that capture exists, SEQ/REC remains CANDIDATE rather than CONFIRMED.
 - `tests/test_unosyp_probe.py`
 
 Main editor behavior and the locked ADSR implementation were not changed.
+
+
+## State Investigator completion update
+
+Implemented on research/protocol-lab:
+- source module ProtocolLab/state_investigator.py with byte/bit differential correlation;
+- GUI modes AUTO and MANUAL — DEVICE for SEQ/REC experiments;
+- confirmed read-only 0x37 current-state request over MIDI OUT;
+- automatic capture of the matching 0x37 response in AUTO mode;
+- physical-device workflow using repeated OFF/ON snapshots;
+- capture of non-SysEx raw MIDI as well as SysEx, so hardware-button notifications are not missed;
+- MIDI Clock F8 filtered by default and excluded from investigator signatures;
+- unit coverage for byte/bit correlation and F8 exclusion;
+- Windows workflow updated to run the investigator tests.
+
+Safety boundary remains unchanged: no guessed SEQ/REC setter, no 0x28 STORE, and no promotion of 0x14 to confirmed without UNO Synth Pro hardware evidence.
+
+### Hardware gate
+
+Software work can determine candidates from captures, but the actual Pro SEQ/REC state mapping requires real transitions from the physical UNO. Required evidence is repeated SEQ OFF/ON/OFF and REC OFF/ON/OFF cycles with 0x37 snapshots and unsolicited traffic saved. Only repeatable candidates should be promoted to CONFIRMED.
