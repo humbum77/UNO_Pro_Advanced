@@ -39,6 +39,16 @@ class ProtocolLabParserTests(unittest.TestCase):
         m.add_bytes(bytes.fromhex("F0 00 21 1A 02 03 3E 00 00 01 F7"))
         self.assertEqual(m.diff_labels("A", "B"), [("0x37", 1, 1, 0), ("0x3E", 0, 1, 1)])
 
+    def test_payload_and_byte_diff(self):
+        m = lab.CaptureModel()
+        m.mark("OFF")
+        m.add_bytes(bytes.fromhex("F0 00 21 1A 02 03 00 37 00 00 01 F7"))
+        m.mark("ON")
+        m.add_bytes(bytes.fromhex("F0 00 21 1A 02 03 00 37 00 00 05 F7"))
+        self.assertEqual(m.byte_diff_pairs("OFF", "ON"), [("0x37", 10, 1, 5)])
+        unique = m.unique_payloads("OFF", "ON")
+        self.assertEqual(unique, [("0x37", "00 00 05")])
+
 
 if __name__ == "__main__":
     unittest.main()
