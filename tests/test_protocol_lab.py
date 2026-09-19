@@ -1,11 +1,6 @@
-import importlib.util
-from pathlib import Path
 import unittest
 
-MODULE = Path(__file__).resolve().parents[1] / "ProtocolLab" / "protocol_lab.py"
-spec = importlib.util.spec_from_file_location("protocol_lab", MODULE)
-lab = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(lab)
+from ProtocolLab import protocol_lab as lab
 
 
 class ProtocolLabParserTests(unittest.TestCase):
