@@ -28,7 +28,7 @@ jobs:
         run: python -m unittest tests.test_protocol_lab tests.test_unosyp_probe
       - name: Build EXE
         shell: pwsh
-        run: pyinstaller --noconfirm --clean --onefile --windowed --name UNO_Synth_Pro_Protocol_Lab ProtocolLab/protocol_lab.py
+        run: pyinstaller --noconfirm --clean --onefile --windowed --collect-all mido --collect-all rtmidi --hidden-import mido.backends.rtmidi --name UNO_Synth_Pro_Protocol_Lab ProtocolLab/protocol_lab.py
       - name: Package
         shell: pwsh
         run: |
