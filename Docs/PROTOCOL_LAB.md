@@ -47,3 +47,32 @@ Run parser tests:
 ```
 python -m unittest tests.test_protocol_lab
 ```
+
+
+## Comparative protocol research — original UNO Synth
+
+The public `mungewell/uno-synth-utils` research documents an original-UNO command that is directly relevant to the Pro synchronization problem:
+
+`F0 00 21 1A 02 01 14 F7` — **CMD 0x14: Report Sequence State**.
+
+Observed original-UNO responses use `F0 00 21 1A 02 01 00 14 ... F7`. In those captures, one status byte changes with panel state: bit `0x04` tracks SEQ LED, `0x01` PLAY, `0x02` REC (flashing), `0x08` HOLD; ARP was observed in another response byte. These are facts about the **original UNO Synth**, not yet facts about UNO Synth Pro.
+
+Why this is a high-value Pro candidate: the product-family framing is structurally similar and two command IDs are already shared across generations in our evidence: `0x24` is used for preset read/name information and `0x33` for preset selection/load. Therefore the Pro-shaped read-only candidate is:
+
+`F0 00 21 1A 02 03 14 F7`
+
+Status: **CANDIDATE / PRO HARDWARE UNVERIFIED**. Protocol Lab v0.1 catalogs incoming `0x14` but does not transmit this request automatically. A real Pro response is required before any bit mapping is promoted to CONFIRMED.
+
+## Offline .unosyp research
+
+`ProtocolLab/unosyp_probe.py` reports the confirmed native automation container without assigning unknown semantics:
+
+- binary Pro magic `25 01 00 00`;
+- automation byte count at offset 494;
+- reserved/unknown byte 495;
+- raw automation payload beginning at offset 496;
+- raw two-byte entry grouping.
+
+The supplied research corpus contains binary examples with counts 0, 2, 4, 28 and 34. Example raw payloads include `29 01`, `58 0E`, and `58 0E 08 C3`. Filenames alone are not sufficient evidence to name those two-byte entries, so the probe intentionally preserves them as raw values.
+
+This confirms the tooling can isolate candidate automation entries for differential experiments while keeping parameter identity/value/step packing PARTIAL/UNKNOWN.
