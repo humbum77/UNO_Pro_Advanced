@@ -122,12 +122,55 @@ class CaptureModel:
         self.events.append(ev)
         return ev
 
+    def events_for_label(self, label: str) -> list[CaptureEvent]:
+        return [ev for ev in self.events if ev.label == label]
+
     def command_counts(self, label: str) -> dict[str, int]:
         counts: dict[str, int] = {}
         for ev in self.events:
             if ev.label == label:
                 counts[ev.command] = counts.get(ev.command, 0) + 1
         return counts
+
+    def payload_signatures(self, label: str) -> dict[str, set[str]]:
+        out: dict[str, set[str]] = {}
+        for ev in self.events_for_label(label):
+            if ev.kind not in ("SYSEX", "IMPORTED"):
+                continue
+            try:
+                parsed = parse_ik_sysex(parse_hex(ev.hex))
+            except ValueError:
+                continue
+            if not parsed.valid_ik:
+                continue
+            out.setdefault(ev.command, set()).add(bytes_to_hex(parsed.payload))
+        return out
+
+    def unique_payloads(self, before: str, after: str) -> list[tuple[str, str]]:
+        a = self.payload_signatures(before)
+        b = self.payload_signatures(after)
+        rows: list[tuple[str, str]] = []
+        for cmd in sorted(set(a) | set(b)):
+            for payload in sorted(b.get(cmd, set()) - a.get(cmd, set())):
+                rows.append((cmd, payload))
+        return rows
+
+    def byte_diff_pairs(self, before: str, after: str) -> list[tuple[str, int, int, int]]:
+        """Compare the last packet for each common command when lengths match."""
+        a = {ev.command: ev for ev in self.events_for_label(before)}
+        b = {ev.command: ev for ev in self.events_for_label(after)}
+        rows: list[tuple[str, int, int, int]] = []
+        for cmd in sorted(set(a) & set(b)):
+            try:
+                ba, bb = parse_hex(a[cmd].hex), parse_hex(b[cmd].hex)
+            except ValueError:
+                continue
+            if len(ba) != len(bb):
+                continue
+            for offset, (old, new) in enumerate(zip(ba, bb)):
+                if old != new:
+                    rows.append((cmd, offset, old, new))
+        return rows
 
     def diff_labels(self, before: str, after: str) -> list[tuple[str, int, int, int]]:
         a, b = self.command_counts(before), self.command_counts(after)
