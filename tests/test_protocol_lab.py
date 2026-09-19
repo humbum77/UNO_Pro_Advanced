@@ -49,6 +49,13 @@ class ProtocolLabParserTests(unittest.TestCase):
         unique = m.unique_payloads("OFF", "ON")
         self.assertEqual(unique, [("0x37", "00 00 05")])
 
+    def test_legacy_sequence_state_candidate_is_catalog_only(self):
+        p = lab.parse_ik_sysex(lab.LEGACY_SEQUENCE_STATE_CANDIDATE)
+        self.assertEqual(p.command, 0x14)
+        self.assertIn("UNVERIFIED", p.role)
+        self.assertEqual(lab.LEGACY_SEQUENCE_STATE_CANDIDATE.hex(" ").upper(),
+                         "F0 00 21 1A 02 03 14 F7")
+
 
 if __name__ == "__main__":
     unittest.main()
