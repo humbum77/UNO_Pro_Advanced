@@ -6,6 +6,7 @@ on:
       - "ProtocolLab/**"
       - "tests/test_protocol_lab.py"
       - "tests/test_unosyp_probe.py"
+      - "tests/test_state_investigator.py"
       - ".github/workflows/protocol-lab-windows.yml"
   workflow_dispatch:
 
@@ -25,7 +26,7 @@ jobs:
           python -m pip install pyinstaller
       - name: Unit tests
         shell: pwsh
-        run: python -m unittest tests.test_protocol_lab tests.test_unosyp_probe
+        run: python -m unittest tests.test_protocol_lab tests.test_unosyp_probe tests.test_state_investigator
       - name: Build EXE
         shell: pwsh
         run: pyinstaller --noconfirm --clean --onefile --windowed --collect-all mido --collect-all rtmidi --hidden-import mido.backends.rtmidi --name UNO_Synth_Pro_Protocol_Lab ProtocolLab/protocol_lab.py
