@@ -27,3 +27,6 @@ The GUI includes AUTO and MANUAL — DEVICE research modes.
 - Stable candidates are reported as byte offset + bit mask + transition. Repeat multiple OFF/ON cycles before treating a candidate as evidence.
 
 The only transmit operation added for this investigator is the project-confirmed 0x37 current-state read. Unknown setters and 0x28 STORE remain locked.
+
+
+Capture fix: MANUAL Capture OFF/ON now always requests a fresh confirmed 0x37 state response; stale snapshots are never reused. Captured 0x27/0x34 device events remain semantically unconfirmed.
