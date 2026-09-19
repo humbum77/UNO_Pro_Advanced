@@ -20,6 +20,12 @@ class ProtocolLabParserTests(unittest.TestCase):
         self.assertEqual(p.command_offset, 7)
         self.assertEqual(p.payload, bytes.fromhex("00 00 01 02"))
 
+    def test_strict_current_state_response_shape(self):
+        raw = bytes.fromhex("F0 00 21 1A 02 03 00 37 00 00") + bytes(298) + bytes([0xF7])
+        self.assertEqual(len(raw), 309)
+        self.assertTrue(lab.is_current_state_response(raw))
+        self.assertFalse(lab.is_current_state_response(raw[:-1]))
+
     def test_unknown_stays_unknown(self):
         raw = bytes.fromhex("F0 00 21 1A 02 03 55 01 F7")
         p = lab.parse_ik_sysex(raw)
