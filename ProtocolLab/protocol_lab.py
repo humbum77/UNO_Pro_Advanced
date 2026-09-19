@@ -251,7 +251,7 @@ class ProtocolLab(tk.Tk):
         ttk.Button(exp, text="Analyze", command=self.analyze_experiment).pack(side="left", padx=4)
         ttk.Button(exp, text="Reset experiment", command=self.reset_experiment).pack(side="left", padx=4)
         self.exp_status = tk.StringVar(value="Use physical UNO button in MANUAL mode; capture repeated OFF/ON states.")
-        ttk.Label(exp, textvariable=self.exp_status).pack(side="left", padx=10)\n
+        ttk.Label(exp, textvariable=self.exp_status).pack(side="left", padx=10)
         columns = ("time", "label", "kind", "cmd", "role", "shape", "len", "hex")
         self.tree = ttk.Treeview(self, columns=columns, show="headings")
         widths = {"time":75,"label":100,"kind":80,"cmd":65,"role":235,"shape":145,"len":55,"hex":500}
@@ -373,13 +373,13 @@ class ProtocolLab(tk.Tk):
         try:
             self.outport.send(mido.Message("sysex", data=raw[1:-1]))
             self.exp_status.set("0x37 state read sent; waiting for response.")
-        except Exception as exc: self.exp_status.set(f"0x37 send error: {exc}")\n
+        except Exception as exc: self.exp_status.set(f"0x37 send error: {exc}")
     def _latest_state_response(self):
         for ev in reversed(self.model.events):
             if ev.command == "0x37" and ev.shape == "RESPONSE-LIKE":
                 try: return parse_hex(ev.hex)
                 except ValueError: return None
-        return None\n
+        return None
     def capture_experiment_state(self, phase: str) -> None:
         self.quick_mark(f"{self.experiment_target.get()}_{phase}")
         if self.experiment_mode.get() == "AUTO":
@@ -392,7 +392,7 @@ class ProtocolLab(tk.Tk):
             self.exp_status.set("No 0x37 response captured yet. Press Read 0x37 after changing the physical button.")
             return
         self.experiment_snapshots[phase].append(raw)
-        self.exp_status.set(f"{self.experiment_target.get()} {phase}: snapshot #{len(self.experiment_snapshots[phase])} captured.")\n
+        self.exp_status.set(f"{self.experiment_target.get()} {phase}: snapshot #{len(self.experiment_snapshots[phase])} captured.")
     def analyze_experiment(self) -> None:
         offs=self.experiment_snapshots["OFF"]; ons=self.experiment_snapshots["ON"]; n=min(len(offs),len(ons))
         if not n:
@@ -402,11 +402,11 @@ class ProtocolLab(tk.Tk):
         if stable:
             txt=", ".join(f"byte {o} mask 0x{m:02X} {int(a)}→{int(b)}" for o,m,a,b in stable[:12])
             self.exp_status.set(f"Stable candidates ({n} cycle(s)): {txt}")
-        else: self.exp_status.set(f"No stable bit candidate across {n} cycle(s).")\n
+        else: self.exp_status.set(f"No stable bit candidate across {n} cycle(s).")
     def reset_experiment(self) -> None:
         self.experiment_snapshots={"OFF":[],"ON":[]}
         self.pending_capture=None
-        self.exp_status.set("Experiment reset. Capture repeated OFF/ON states.")\n
+        self.exp_status.set("Experiment reset. Capture repeated OFF/ON states.")
     def set_marker(self) -> None:
         self.model.mark(self.label_var.get())
         self.status_var.set(f"Capture label = {self.model.current_label} • READ ONLY")
