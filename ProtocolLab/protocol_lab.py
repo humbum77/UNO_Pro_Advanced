@@ -18,7 +18,10 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 from typing import Iterable, Optional
 
-from ProtocolLab.state_investigator import stable_bit_changes
+try:
+    from ProtocolLab.state_investigator import stable_bit_changes
+except ModuleNotFoundError:  # direct script launch from ProtocolLab/
+    from state_investigator import stable_bit_changes
 
 try:
     import mido
@@ -74,6 +77,11 @@ class ParsedSysex:
 
     def command_text(self) -> str:
         return "--" if self.command is None else f"0x{self.command:02X}"
+
+
+def is_current_state_response(data: bytes) -> bool:
+    """Strictly identify the captured 309-byte UNO Synth Pro 0x37 state reply."""
+    return len(data) == 309 and data[:10] == bytes.fromhex("F0 00 21 1A 02 03 00 37 00 00") and data[-1] == 0xF7
 
 
 def parse_ik_sysex(data: bytes) -> ParsedSysex:
@@ -346,7 +354,7 @@ class ProtocolLab(tk.Tk):
                 raw, msg_kind = payload
                 ev = self.model.add_bytes(raw, msg_kind)
                 self._append_event(ev)
-                if ev.command == "0x37" and ev.shape == "RESPONSE-LIKE" and self.pending_capture:
+                if is_current_state_response(raw) and self.pending_capture:
                     phase = self.pending_capture
                     self.pending_capture = None
                     self.experiment_snapshots[phase].append(raw)
@@ -377,7 +385,9 @@ class ProtocolLab(tk.Tk):
     def _latest_state_response(self):
         for ev in reversed(self.model.events):
             if ev.command == "0x37" and ev.shape == "RESPONSE-LIKE":
-                try: return parse_hex(ev.hex)
+                try:
+                    raw = parse_hex(ev.hex)
+                    if is_current_state_response(raw): return raw
                 except ValueError: return None
         return None
     def capture_experiment_state(self, phase: str) -> None:
