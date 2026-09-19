@@ -195,8 +195,8 @@ class CaptureModel:
 class ProtocolLab(tk.Tk):
     def __init__(self) -> None:
         super().__init__()
-        self.title("UNO Synth Pro Protocol Lab v0.1 — READ ONLY")
-        self.geometry("1180x720")
+        self.title("UNO Synth Pro Protocol Lab v0.2 — State Investigator")
+        self.geometry("1480x760")
         self.minsize(900, 560)
         self.model = CaptureModel()
         self.rx_queue: queue.Queue[tuple[str, object]] = queue.Queue()
@@ -287,7 +287,7 @@ class ProtocolLab(tk.Tk):
         if not names:
             self.status_var.set("No MIDI IN ports found. Reconnect UNO, then Refresh.")
         else:
-            self.status_var.set(f"Found {len(names)} MIDI IN port(s) • READ ONLY")
+            self.status_var.set(f"Found {len(names)} MIDI IN port(s) • safe research mode")
         if names and self.port_var.get() not in names:
             pro = next((x for x in names if "UNO" in x.upper()), names[0])
             self.port_var.set(pro)
@@ -315,7 +315,7 @@ class ProtocolLab(tk.Tk):
             messagebox.showerror("Protocol Lab", str(exc))
             return
         self.connect_btn.configure(text="Disconnect")
-        self.status_var.set(f"Listening: {name} • READ ONLY")
+        self.status_var.set(f"Listening: {name} • 0x37 read enabled")
 
     def _midi_callback(self, msg) -> None:
         try:
