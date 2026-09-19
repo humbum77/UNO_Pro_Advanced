@@ -199,6 +199,7 @@ class ProtocolLab(tk.Tk):
         self.model = CaptureModel()
         self.rx_queue: queue.Queue[tuple[str, object]] = queue.Queue()
         self.inport = None
+        self.show_clock_var = tk.BooleanVar(value=False)
         self._build_ui()
         self.refresh_ports()
         self.after(50, self._drain_queue)
@@ -215,7 +216,9 @@ class ProtocolLab(tk.Tk):
         self.connect_btn = ttk.Button(top, text="Connect", command=self.toggle_connect)
         self.connect_btn.pack(side="left", padx=6)
 
-        self.status_var = tk.StringVar(value="READ ONLY • no SysEx transmit path")
+        ttk.Checkbutton(top, text="Show MIDI Clock (F8)", variable=self.show_clock_var).pack(side="left", padx=(10, 0))
+
+        self.status_var = tk.StringVar(value="READ ONLY • F8 filtered • no SysEx transmit path")
         ttk.Label(top, textvariable=self.status_var).pack(side="right")
 
         marker = ttk.Frame(self, padding=(8, 0, 8, 8))
@@ -293,8 +296,13 @@ class ProtocolLab(tk.Tk):
             if msg.type == "sysex":
                 raw = bytes([0xF0, *msg.data, 0xF7])
                 self.rx_queue.put(("bytes", (raw, "SYSEX")))
-            elif msg.type in ("start", "stop", "continue", "clock"):
-                self.rx_queue.put(("transport", str(msg)))
+            elif msg.type == "clock":
+                # MIDI Clock is 24 PPQN and can flood captures. Filter F8 by default.
+                if self.show_clock_var.get():
+                    self.rx_queue.put(("transport", bytes([0xF8])))
+            elif msg.type in ("start", "continue", "stop"):
+                transport_bytes = {"start": 0xFA, "continue": 0xFB, "stop": 0xFC}
+                self.rx_queue.put(("transport", bytes([transport_bytes[msg.type]])))
         except Exception as exc:
             self.rx_queue.put(("error", str(exc)))
 
@@ -308,8 +316,7 @@ class ProtocolLab(tk.Tk):
                 raw, msg_kind = payload
                 self._append_event(self.model.add_bytes(raw, msg_kind))
             elif kind == "transport":
-                raw = str(payload).encode("ascii", errors="replace")
-                self._append_event(self.model.add_bytes(raw, "MIDI TRANSPORT"))
+                self._append_event(self.model.add_bytes(bytes(payload), "MIDI TRANSPORT"))
             elif kind == "error":
                 self.status_var.set(f"Capture error: {payload}")
         self.after(50, self._drain_queue)
