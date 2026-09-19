@@ -20,8 +20,15 @@ from typing import Iterable, Optional
 
 try:
     import mido
-except ImportError:  # UI can still open for offline analysis/import.
+    try:
+        import rtmidi  # Force the bundled python-rtmidi backend in frozen builds.
+        mido.set_backend("mido.backends.rtmidi")
+        MIDI_BACKEND_ERROR = None
+    except Exception as exc:
+        MIDI_BACKEND_ERROR = str(exc)
+except ImportError as exc:  # UI can still open for offline analysis/import.
     mido = None
+    MIDI_BACKEND_ERROR = str(exc)
 
 IK_HEADER = (0xF0, 0x00, 0x21, 0x1A, 0x02, 0x03)
 SYSEX_END = 0xF7
@@ -239,7 +246,11 @@ class ProtocolLab(tk.Tk):
     def refresh_ports(self) -> None:
         if mido is None:
             self.port_combo["values"] = ()
-            self.status_var.set("mido not installed • offline analysis available")
+            self.status_var.set(f"MIDI runtime unavailable: {MIDI_BACKEND_ERROR} • offline analysis available")
+            return
+        if MIDI_BACKEND_ERROR:
+            self.port_combo["values"] = ()
+            self.status_var.set(f"MIDI backend unavailable: {MIDI_BACKEND_ERROR}")
             return
         try:
             names = mido.get_input_names()
@@ -247,6 +258,10 @@ class ProtocolLab(tk.Tk):
             names = []
             self.status_var.set(f"MIDI backend error: {exc}")
         self.port_combo["values"] = names
+        if not names:
+            self.status_var.set("No MIDI IN ports found. Reconnect UNO, then Refresh.")
+        else:
+            self.status_var.set(f"Found {len(names)} MIDI IN port(s) • READ ONLY")
         if names and self.port_var.get() not in names:
             pro = next((x for x in names if "UNO" in x.upper()), names[0])
             self.port_var.set(pro)
