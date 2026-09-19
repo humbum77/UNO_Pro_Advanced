@@ -5,6 +5,8 @@ on:
     branches:
       - "research/protocol-lab"
   pull_request:
+    branches:
+      - main
     paths:
       - "ProtocolLab/**"
       - "tests/test_protocol_lab.py"
