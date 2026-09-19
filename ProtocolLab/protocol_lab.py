@@ -206,6 +206,7 @@ class ProtocolLab(tk.Tk):
         self.experiment_mode = tk.StringVar(value="MANUAL — DEVICE")
         self.experiment_target = tk.StringVar(value="SEQ")
         self.experiment_snapshots = {"OFF": [], "ON": []}
+        self.pending_capture = None
         self._build_ui()
         self.refresh_ports()
         self.after(50, self._drain_queue)
@@ -226,7 +227,7 @@ class ProtocolLab(tk.Tk):
 
         ttk.Checkbutton(top, text="Show MIDI Clock (F8)", variable=self.show_clock_var).pack(side="left", padx=(10, 0))
 
-        self.status_var = tk.StringVar(value="READ ONLY • F8 filtered • no SysEx transmit path")
+        self.status_var = tk.StringVar(value="SAFE RESEARCH • F8 filtered • only confirmed 0x37 transmit enabled")
         ttk.Label(top, textvariable=self.status_var).pack(side="right")
 
         marker = ttk.Frame(self, padding=(8, 0, 8, 8))
@@ -328,6 +329,10 @@ class ProtocolLab(tk.Tk):
             elif msg.type in ("start", "continue", "stop"):
                 transport_bytes = {"start": 0xFA, "continue": 0xFB, "stop": 0xFC}
                 self.rx_queue.put(("transport", bytes([transport_bytes[msg.type]])))
+            else:
+                raw = bytes(msg.bytes())
+                if raw and raw != b"\xF8":
+                    self.rx_queue.put(("bytes", (raw, "MIDI RAW")) )
         except Exception as exc:
             self.rx_queue.put(("error", str(exc)))
 
@@ -339,7 +344,13 @@ class ProtocolLab(tk.Tk):
                 break
             if kind == "bytes":
                 raw, msg_kind = payload
-                self._append_event(self.model.add_bytes(raw, msg_kind))
+                ev = self.model.add_bytes(raw, msg_kind)
+                self._append_event(ev)
+                if ev.command == "0x37" and ev.shape == "RESPONSE-LIKE" and self.pending_capture:
+                    phase = self.pending_capture
+                    self.pending_capture = None
+                    self.experiment_snapshots[phase].append(raw)
+                    self.exp_status.set(f"{self.experiment_target.get()} {phase}: auto snapshot #{len(self.experiment_snapshots[phase])} captured.")
             elif kind == "transport":
                 self._append_event(self.model.add_bytes(bytes(payload), "MIDI TRANSPORT"))
             elif kind == "error":
@@ -360,7 +371,7 @@ class ProtocolLab(tk.Tk):
             self.exp_status.set("Connect MIDI OUT first."); return
         raw=bytes.fromhex("F0 00 21 1A 02 03 37 00 00 F7")
         try:
-            self.outport.send(mido.Message.from_bytes(list(raw)))
+            self.outport.send(mido.Message("sysex", data=raw[1:-1]))
             self.exp_status.set("0x37 state read sent; waiting for response.")
         except Exception as exc: self.exp_status.set(f"0x37 send error: {exc}")\n
     def _latest_state_response(self):
@@ -370,12 +381,17 @@ class ProtocolLab(tk.Tk):
                 except ValueError: return None
         return None\n
     def capture_experiment_state(self, phase: str) -> None:
+        self.quick_mark(f"{self.experiment_target.get()}_{phase}")
+        if self.experiment_mode.get() == "AUTO":
+            self.pending_capture = phase
+            self.read_current_state()
+            self.exp_status.set(f"AUTO: requesting {self.experiment_target.get()} {phase} state via confirmed 0x37...")
+            return
         raw=self._latest_state_response()
         if raw is None:
-            self.exp_status.set("No 0x37 response captured yet.")
+            self.exp_status.set("No 0x37 response captured yet. Press Read 0x37 after changing the physical button.")
             return
         self.experiment_snapshots[phase].append(raw)
-        self.quick_mark(f"{self.experiment_target.get()}_{phase}")
         self.exp_status.set(f"{self.experiment_target.get()} {phase}: snapshot #{len(self.experiment_snapshots[phase])} captured.")\n
     def analyze_experiment(self) -> None:
         offs=self.experiment_snapshots["OFF"]; ons=self.experiment_snapshots["ON"]; n=min(len(offs),len(ons))
@@ -389,6 +405,7 @@ class ProtocolLab(tk.Tk):
         else: self.exp_status.set(f"No stable bit candidate across {n} cycle(s).")\n
     def reset_experiment(self) -> None:
         self.experiment_snapshots={"OFF":[],"ON":[]}
+        self.pending_capture=None
         self.exp_status.set("Experiment reset. Capture repeated OFF/ON states.")\n
     def set_marker(self) -> None:
         self.model.mark(self.label_var.get())
