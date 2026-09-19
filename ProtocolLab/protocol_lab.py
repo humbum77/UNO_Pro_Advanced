@@ -320,6 +320,14 @@ class ProtocolLab(tk.Tk):
             self.inport = mido.open_input(name, callback=self._midi_callback)
             if self.out_var.get(): self.outport=mido.open_output(self.out_var.get())
         except Exception as exc:
+            if self.inport is not None:
+                try: self.inport.close()
+                except Exception: pass
+                self.inport = None
+            if self.outport is not None:
+                try: self.outport.close()
+                except Exception: pass
+                self.outport = None
             messagebox.showerror("Protocol Lab", str(exc))
             return
         self.connect_btn.configure(text="Disconnect")
@@ -397,12 +405,11 @@ class ProtocolLab(tk.Tk):
             self.read_current_state()
             self.exp_status.set(f"AUTO: requesting {self.experiment_target.get()} {phase} state via confirmed 0x37...")
             return
-        raw=self._latest_state_response()
-        if raw is None:
-            self.exp_status.set("No 0x37 response captured yet. Press Read 0x37 after changing the physical button.")
-            return
-        self.experiment_snapshots[phase].append(raw)
-        self.exp_status.set(f"{self.experiment_target.get()} {phase}: snapshot #{len(self.experiment_snapshots[phase])} captured.")
+        # MANUAL means the user changes the physical UNO state; capture itself is automatic.
+        # Never reuse a stale 0x37 packet from an earlier phase.
+        self.pending_capture = phase
+        self.read_current_state()
+        self.exp_status.set(f"MANUAL: requesting fresh {self.experiment_target.get()} {phase} state via confirmed 0x37...")
     def analyze_experiment(self) -> None:
         offs=self.experiment_snapshots["OFF"]; ons=self.experiment_snapshots["ON"]; n=min(len(offs),len(ons))
         if not n:
