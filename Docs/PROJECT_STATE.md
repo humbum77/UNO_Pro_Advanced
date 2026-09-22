@@ -1,6 +1,6 @@
 # UNO Pro Advanced — состояние проекта
 
-Дата фиксации: 2026-09-17.
+Дата фиксации: 2026-09-22.
 
 ## Основное правило ведения проекта
 
@@ -80,3 +80,33 @@ Push/создание тегов/публикация GitHub Release пока н
 
 Для v0.9.7-beta актуальны `Docs/RELEASE_NOTES_v0.9.7-beta.md`, `Docs/PROJECT_STATE.md`, `Docs/DECISIONS.md` и `CHANGELOG.md`.
 Этот файл и DECISIONS.md зеркалируются из `D:\UNO\docs` в `D:\UNO\project_unified\Docs`, чтобы общие решения были доступны и на GitHub.
+
+
+## 2026-09-22 — Native Step Automation: актуальное состояние Parameter Selection
+
+Исследование продолжено на чистых multi-lane differential captures. Старые модели, основанные на прямом анализе packed-байтов как 14-bit lane records, сняты.
+
+Подтверждён транспортный слой automation extension:
+- сначала выполняется непрерывный 7→8 bit unpack;
+- после unpack наблюдается структура `Step | Count | Control/Selection | Native value stream`;
+- длина наблюдаемого Control/Selection-блока равна `ceil(Count/8)` байт;
+- Count считает automation entries;
+- native values имеют как минимум 8-bit и 16-bit представления.
+
+Чистый ряд `S0–S4` опроверг простую модель `Control = skip distance`:
+- S0: ENV1+ENV2+SPACING+DRIVE → Count 4, Control `00`, payload `20 20 20 40`;
+- S1: ENV1+SPACING+DRIVE → Count 3, Control `00`, payload `20 20 40`;
+- S2: ENV1+DRIVE → Count 2, Control `00`, payload `20 40`;
+- S3: ENV1+REVERB → Count 2, Control `50`, payload `20 32`;
+- S4: DRIVE+REVERB → Count 2, Control `A8`, payload `40 32`.
+
+Следовательно:
+- Control не является абсолютным Parameter ID;
+- Control не является width bitmap;
+- Control не является самостоятельной presence-mask;
+- Control не является простым кодом количества пропущенных canonical slots;
+- `(Count, Control)` недостаточно для восстановления ParameterSet.
+
+Рабочее направление: побитовое сравнение Page1 с Pages2–4 на S0–S4. В исследованных captures Pages2–4 дают value payload без наблюдаемого отдельного Control/Selection-блока; Page1 содержит дополнительную target-selection информацию. Необходимо отделить биты, объясняемые native values, от target metadata и только после cross-validation реализовывать writer.
+
+Статус Parameter Resolution и writer: **PARTIAL / UNKNOWN**. Полноценный `Step → Parameter → Value` decoder/writer пока не объявлять работающим.
