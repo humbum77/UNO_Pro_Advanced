@@ -95,3 +95,15 @@
 - `release/v0.9.7-beta` остаётся неизменной резервной точкой состояния до адаптивной переработки UI.
 - Версия приложения остаётся `0.9.7-beta`; пользователь не давал команды на изменение номера версии.
 - Пользовательская визуальная приёмка относится к адаптивной компоновке интерфейса. Она не повышает SOFTWARE PASS декодера до HARDWARE PASS и не меняет статусы PARTIAL/UNKNOWN.
+
+
+## 2026-09-22 — правила исследования Native Step Automation / Parameter Selection
+
+- Для automation extension обязательным первым этапом считать непрерывный 7→8 bit unpack. Не выводить семантику непосредственно из packed-байтов.
+- Наблюдаемую после unpack структуру `Step | Count | Control/Selection | Native value stream` использовать как текущую транспортную модель; длина Control/Selection на проверенном корпусе равна `ceil(Count/8)`.
+- Снять и не использовать как установленные модели: `Control = Parameter ID`, `Control = width bitmap`, `Control = standalone presence mask`, `Control = skip distance`, а также прежнюю модель независимых raw 2-byte/14-bit lane records.
+- Ряд S0/S1/S2 является контрольным опровержением skip-distance: удаление ENV2 и затем ENV2+SPACING сохраняет Control=`00`.
+- S3/S4 фиксируются как anchors ненулевого Control: ENV1+REVERB → `50`; DRIVE+REVERB → `A8`. Их семантику не объявлять установленной до независимой cross-validation.
+- Из-за ошибок передачи UNO ↔ официальный Editor спорные single-captures не использовать как основу Parameter Resolution. Приоритет — воспроизводимые multi-lane differential captures на одном Step/slot с изменением одного известного параметра.
+- Следующий обязательный этап — побитовое Page1 ↔ Pages2–4 сравнение на чистом S0–S4 для выделения target metadata.
+- До завершения этого этапа и обратной проверки writer статус Parameter Resolution остаётся `PARTIAL / UNKNOWN`; новые decoder versions как «готовые» не выпускать.
