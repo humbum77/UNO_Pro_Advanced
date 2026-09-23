@@ -114,13 +114,19 @@ def load_binary_unosyp_state(path):
 def load_binary_unosyp_sequence(path):
     """Read-only decode of the confirmed 1081-byte UNO .unosyp sequencer."""
     from unosyp_seq_decoder import parse_unosyp
-    from native_automation import read_automation,sequence_length
+    from native_automation import apply_decoded_to_sequence,read_automation,sequence_length
     raw=Path(path).read_bytes();info=parse_unosyp(raw)
     if not info.get('supported_sequence_variant'):
         return None
     seq=Sequence();seq.length_confirmed=True
     seq.native_raw_hex=raw.hex()
-    try:seq.native_automation=read_automation(raw)
+    try:
+        decoded=read_automation(raw)
+        if decoded.get('profile'):
+            from uno_step_automation_decoder import decode
+            apply_decoded_to_sequence(seq,decode(raw))
+        else:
+            seq.native_automation=decoded
     except ValueError as exc:seq.native_automation={'status':'UNKNOWN','warning':str(exc)}
     seq.binary_page_headers=[p.get('header_hex','') for p in info.get('pages',[])]
     seq.binary_page_metadata=[p.get('metadata_hex','') for p in info.get('pages',[])]

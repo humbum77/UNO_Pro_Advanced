@@ -131,6 +131,33 @@ def _packed7_value(data: bytes) -> int:
     return sum((value & 0x7F) << (7 * index) for index, value in enumerate(data))
 
 
+def decode_payload_note_steps(payload: bytes, page_index: int) -> list[Dict[str, Any]]:
+    """Decode notes from a hardware/variable-file page without shifting records.
+
+    The 192-byte payload stores raw page bytes 1..159 in its first 182 packed
+    bytes.  Raw byte 0 is unavailable, so it must be represented separately;
+    inserting synthetic bytes into the packed stream shifts every note field.
+    """
+    payload = bytes(payload)
+    if len(payload) < 192:
+        raise ValueError(f'sequence page payload must be at least 192 bytes, got {len(payload)}')
+    bits = []
+    for byte in payload[:182]:
+        value = byte & 0x7F
+        bits.extend((value >> bit) & 1 for bit in range(7))
+    bits = bits[:159 * 8]
+    tail = bytes(
+        sum(bit << offset for offset, bit in enumerate(bits[pos:pos + 8]))
+        for pos in range(0, len(bits), 8)
+    )
+    logical = bytes([0]) + tail
+    steps = []
+    for local_step in range(STEPS_PER_PAGE):
+        record = logical[local_step * STEP_SIZE:(local_step + 1) * STEP_SIZE]
+        steps.append(decode_step_record(record, page_index * STEPS_PER_PAGE + local_step + 1))
+    return steps
+
+
 def decode_gate_accent_values(data: bytes = b'', page0_payload: bytes = b'') -> tuple[int, int]:
     """Decode the shared sequencer Gate/Accent values from file or 0x29 page 0.
 
@@ -277,6 +304,45 @@ def parse_payload_page(
 
 
 def parse_unosyp(data: bytes) -> Dict[str, Any]:
+    # Presets saved by UNO Pro Advanced use the same .unosyp extension but are
+    # JSON documents.  Detect them before any fixed-offset binary parsing.
+    try:
+        document = json.loads(bytes(data).decode('utf-8-sig'))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        document = None
+    if isinstance(document, dict) and isinstance(document.get('sequence'), dict):
+        sequence = document['sequence'];raw_steps=sequence.get('steps',[])
+        if not isinstance(raw_steps,list):raise ValueError('editor JSON sequence.steps must be a list')
+        length=sequence.get('length',16)
+        if type(length) is not int or not 1<=length<=64:raise ValueError('editor JSON sequence.length must be 1..64')
+        steps=[]
+        for index in range(64):
+            source=raw_steps[index] if index<len(raw_steps) and isinstance(raw_steps[index],dict) else {}
+            raw_notes=source.get('notes',[]);raw_velocities=source.get('note_velocities',[]);raw_extras=source.get('note_extras',[])
+            voices=[];notes=[]
+            for voice in range(3):
+                note=int(raw_notes[voice]) if isinstance(raw_notes,list) and voice<len(raw_notes) else 0xFF
+                velocity=int(raw_velocities[voice]) if isinstance(raw_velocities,list) and voice<len(raw_velocities) else int(source.get('velocity',0) if voice==0 else 0)
+                extra=int(raw_extras[voice]) if isinstance(raw_extras,list) and voice<len(raw_extras) else 0
+                empty=not 0<=note<=127
+                item={'voice':voice+1,'empty':empty,'note_raw':note,'note_name':midi_note_name(note) if not empty else None,'velocity':velocity&0x7F,'extra_raw':extra&0xFF}
+                voices.append(item)
+                if not empty:notes.append(item)
+            steps.append({'step':index+1,'control_raw':int(source.get('control_raw',0))&0xFF,
+                          'gate':int(source.get('gate',0)),'accent':int(source.get('accent',0)),
+                          'tie':bool(source.get('tie',False)),'record_hex':'','active':bool(notes),
+                          'notes':notes,'voices':voices})
+        pages=[]
+        for page_index in range(4):
+            page_steps=steps[page_index*16:(page_index+1)*16]
+            pages.append({'page':page_index+1,'file_offset_start':None,'file_offset_end':None,
+                          'header_hex':'','packed_hex':'','metadata_hex':'','raw_hex':'',
+                          'gate_step_map':0,'accent_step_map':0,'tie_step_map':0,'steps':page_steps})
+        return {'size':len(data),'expected_size':None,'format':'editor-json','supported_sequence_variant':True,
+                'sequence_start':None,'sequence_length':length,'pages':pages,'steps':steps,
+                'active_steps':[s['step'] for s in steps[:length] if s['active']],
+                'native_automation':sequence.get('native_automation',{}),
+                'automation':sequence.get('automation',[]),'gate_value':None,'accent_value':None}
     # Confirmed global values paired with the page-local step maps.
     # Gate controls: 0/1/7/10. ACC controls: 0/1/27/127.
     gate_value, accent_value = decode_gate_accent_values(data=data)
@@ -319,6 +385,16 @@ def parse_unosyp(data: bytes) -> Dict[str, Any]:
             page = parse_payload_page(
                 payload, page_index, gate_value, accent_value, offset-size-4
             )
+            # Variable file pages use the same payload alignment as hardware
+            # 0x29: raw byte 0 is omitted.  Keep automation maps from the
+            # metadata parser, but take notes/velocities/extras from the
+            # fix13-compatible unshifted decoder.
+            note_steps = decode_payload_note_steps(payload, page_index)
+            for note_step, automation_step in zip(note_steps, page['steps']):
+                note_step['gate'] = automation_step['gate']
+                note_step['accent'] = automation_step['accent']
+                note_step['tie'] = automation_step['tie']
+            page['steps'] = note_steps
             result['pages'].append(page)
     except ValueError as exc:
         result['warning']=f'Invalid variable-length sequence pages: {exc}'
@@ -341,6 +417,7 @@ def parse_unosyp(data: bytes) -> Dict[str, Any]:
 
 def print_summary(info: Dict[str, Any], show_all: bool = False, show_raw: bool = False) -> None:
     print(f"File size: {info['size']} bytes")
+    print(f"Format: {info.get('format', 'binary')}")
     print(f"Supported sequence variant: {info['supported_sequence_variant']}")
 
     if not info["supported_sequence_variant"]:

@@ -11,7 +11,9 @@ Confirmed from official Editor capture + DFU comparison:
 No write/store operation is implemented here.
 """
 from typing import Dict,Any
-from unosyp_seq_decoder import decode_gate_accent_values,parse_payload_page
+from unosyp_seq_decoder import decode_gate_accent_values,decode_payload_note_steps,parse_payload_page
+from uno_step_automation_decoder import decode_page_payloads
+from native_automation import apply_decoded_to_sequence
 
 RESPONSE_PREFIX=bytes([0xF0,0x00,0x21,0x1A,0x02,0x03,0x00,0x29])
 PAGE_PAYLOAD_SIZE=192
@@ -40,19 +42,23 @@ def decode_pages(pages:Dict[int,bytes])->Dict[str,Any]:
         payload=bytes(pages[page])
         if len(payload)<PAGE_PAYLOAD_SIZE:raise ValueError(f'page {page}: expected at least 192 bytes, got {len(payload)}')
         decoded=parse_payload_page(payload,page-1,gate_value,accent_value)
+        note_steps=decode_payload_note_steps(payload,page-1)
         decoded_pages.append(decoded);metadata.append(decoded['metadata_hex'])
-        for item in decoded['steps']:
+        for note_item,automation_item in zip(note_steps,decoded['steps']):
             notes=[];vels=[];extras=[]
-            for voice in item['voices']:
+            for voice in note_item['voices']:
                 if voice['empty']:continue
                 note=voice['note_raw']
                 if 0<=note<=127:
                     notes.append(note);vels.append(voice['velocity']&0x7F);extras.append(voice['extra_raw']&0xFF)
-            steps.append({'step':item['step'],'control_raw':item['control_raw'],
+            steps.append({'step':note_item['step'],'control_raw':note_item['control_raw'],
                           'notes':notes,'note_velocities':vels,'note_extras':extras,
-                          'gate':item['gate'],'accent':item['accent'],'tie':item['tie']})
+                          'gate':automation_item['gate'],'accent':automation_item['accent'],
+                          'tie':automation_item['tie']})
+    automation=decode_page_payloads([pages[page] for page in range(1,5)])
     return {'steps':steps,'metadata':metadata,'pages':decoded_pages,
-            'gate_value':gate_value,'accent_value':accent_value}
+            'gate_value':gate_value,'accent_value':accent_value,
+            'automation':automation}
 
 def apply_to_sequence(sequence,pages:Dict[int,bytes]):
     info=decode_pages(pages);active_last=0
@@ -69,4 +75,6 @@ def apply_to_sequence(sequence,pages:Dict[int,bytes]):
     sequence.length_confirmed=False
     sequence.binary_page_headers=[]
     sequence.binary_page_metadata=list(info['metadata'])
+    sequence.binary_page_payloads=[bytes(pages[p]).hex() for p in range(1,5)]
+    apply_decoded_to_sequence(sequence,info['automation'])
     return info

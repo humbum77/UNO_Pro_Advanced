@@ -107,3 +107,19 @@
 - Из-за ошибок передачи UNO ↔ официальный Editor спорные single-captures не использовать как основу Parameter Resolution. Приоритет — воспроизводимые multi-lane differential captures на одном Step/slot с изменением одного известного параметра.
 - Следующий обязательный этап — побитовое Page1 ↔ Pages2–4 сравнение на чистом S0–S4 для выделения target metadata.
 - До завершения этого этапа и обратной проверки writer статус Parameter Resolution остаётся `PARTIAL / UNKNOWN`; новые decoder versions как «готовые» не выпускать.
+
+## 2026-09-23 — ограниченный decoder и hardware lane integration
+
+- Точные capture-профили разрешено применять для read-only распознавания
+  известных комбинаций. Универсальный Parameter Resolution и writer остаются
+  `PARTIAL / UNKNOWN`.
+- Заводской `[053] FAKE 808` принят как подтверждённый multi-step профиль
+  `CUTOFF 1`.
+- Файловый и hardware-пути используют один decoder и общий перенос результата
+  в `Sequence.automation`.
+- Регрессия hardware adapter: восемь точек `CUTOFF 1` на шагах
+  6, 7, 11, 23, 27, 54, 55, 59.
+- Лимит устройства — максимум 18 automation entries на шаг.
+- Неизвестные сочетания остаются RAW и не получают предполагаемых имён.
+- `CANONICAL-STEP-DECODER` запрещён к использованию; исправленный артефакт —
+  `HARDWARE-AUTOMATION-FIX`.

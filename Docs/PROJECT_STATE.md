@@ -1,6 +1,6 @@
 # UNO Pro Advanced — состояние проекта
 
-Дата фиксации: 2026-09-22.
+Дата фиксации: 2026-09-23.
 
 ## Основное правило ведения проекта
 
@@ -110,3 +110,20 @@ Push/создание тегов/публикация GitHub Release пока н
 Рабочее направление: побитовое сравнение Page1 с Pages2–4 на S0–S4. В исследованных captures Pages2–4 дают value payload без наблюдаемого отдельного Control/Selection-блока; Page1 содержит дополнительную target-selection информацию. Необходимо отделить биты, объясняемые native values, от target metadata и только после cross-validation реализовывать writer.
 
 Статус Parameter Resolution и writer: **PARTIAL / UNKNOWN**. Полноценный `Step → Parameter → Value` decoder/writer пока не объявлять работающим.
+
+## 2026-09-23 — Step Automation hardware integration
+
+- Добавлен единый ограниченный read-only decoder для заводских `.unosyp` и
+  аппаратных страниц SysEx `0x29`.
+- Hardware adapter теперь переносит распознанные точки в
+  `Sequence.automation`.
+- Regression preset `[053] FAKE 808`: `CUTOFF 1` на шагах
+  6, 7, 11, 23, 27, 54, 55, 59; первые значения 511, 512, 511.
+- Подтверждён предел 18 automation entries на шаг.
+- Неизвестные сочетания сохраняются RAW. Универсальный Parameter Resolution
+  и writer остаются `PARTIAL / UNKNOWN`.
+- Статус — SOFTWARE PASS на предоставленных captured bytes; новый физический
+  HARDWARE PASS не заявляется.
+- Исправленный артефакт:
+  `UNO_Pro_Advanced_v0.9.7-beta2-HARDWARE-AUTOMATION-FIX.zip`.
+  Предыдущий `CANONICAL-STEP-DECODER` недействителен.
