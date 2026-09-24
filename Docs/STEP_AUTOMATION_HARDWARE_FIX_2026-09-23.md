@@ -1,5 +1,14 @@
 # Step Automation hardware integration — 2026-09-23
 
+## Native value writer — 2026-09-24
+
+Native sources now stay native through `SAVE` and `SAVE AS`. The writer edits
+only targets resolved from the source file, retains their Selection/Alignment
+metadata, rebuilds the four variable-length page extensions, and verifies the
+result after repacking. State bytes, sequence cores and unresolved automation
+remain byte-exact. Unsupported target-set mutation is rejected; it is never
+silently serialized as JSON and never guessed.
+
 ## Controlled order addendum — 2026-09-24
 
 The controlled DRIVE/DELAY pair closes one ambiguity in the ordered value

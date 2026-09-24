@@ -2,6 +2,19 @@
 
 Дата фиксации: 2026-09-23.
 
+## Native writer — 2026-09-24
+
+- Для загруженного binary `.unosyp` кнопки `SAVE` / `SAVE AS` записывают
+  binary `.unosyp`, а не JSON-документ редактора.
+- Writer меняет значения уже разрешённых targets, пересобирает cumulative
+  extensions всех четырёх страниц и сохраняет state/core/Selection/opaque
+  bytes без изменений.
+- Подтверждены и включены value codecs: direct 1-byte, bipolar ENV/SPACING,
+  TUNE cents, LFO centi-Hz и проверенная внутренняя область CUTOFF.
+- Добавление/удаление target, WAVE и CUTOFF boundaries 0/512 блокируются с
+  явной ошибкой. Это защитная граница: формула синтеза нового Selection из
+  произвольного набора targets аппаратно не подтверждена.
+
 ## Step Automation addendum — 2026-09-24
 
 - DRIVE/DELAY values have canonical order independent of knob-recording order:

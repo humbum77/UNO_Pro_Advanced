@@ -1,5 +1,16 @@
 # Changelog
 
+## Native Step Automation writer — 2026-09-24
+
+- `SAVE` / `SAVE AS` now retain binary `.unosyp` when the source preset is
+  native; the file is no longer converted to editor JSON.
+- Added end-to-end value writing for already-resolved Step Automation targets
+  with confirmed value codecs, including multi-step cumulative pages.
+- Native preset state, page cores, target Selection/Alignment and unresolved
+  automation bytes are preserved exactly.
+- Target-set additions/removals and unconfirmed WAVE/CUTOFF boundary encodings
+  fail explicitly instead of producing a corrupt preset.
+
 ## Step Automation codec follow-up — 2026-09-24
 
 - Recognized equivalent DRIVE/DELAY order variants `C0/C8`.

@@ -1,4 +1,4 @@
-"""Read-only Step Automation decoding and shared Sequence lane integration."""
+"""Step Automation decoding, lane integration and guarded native value writing."""
 
 PARAMETER_TO_LANE = {
     'WAVE1': 'WAVE 1', 'TUNE1': 'TUNE 1', 'WAVE2': 'WAVE 2',
@@ -20,7 +20,9 @@ def normalize_decoded(native):
          'value': item.get('value', item['native_signed']
                            if item.get('native_signed') is not None
                            else item.get('native_unsigned')),
-         'step': item.get('step', native.get('step'))}
+         'step': item.get('step', native.get('step')),
+         'record_index': item.get('record_index', 0),
+         'payload_offset': item.get('payload_offset', 0)}
         for item in parameters
     ]
     return {'status': 'CAPTURE_PROFILE' if native.get('profile') else 'PARTIAL',
@@ -89,3 +91,38 @@ def encode_sequence_length(data,length):
     result=bytearray(data);value=length*8-1
     result[207]=value&127;result[208]=value>>7
     return bytes(result)
+
+
+def write_sequence_automation(sequence):
+    """Build a native preset by editing resolved targets in its source bytes."""
+    from uno_step_automation_decoder import write_resolved_values
+    if not getattr(sequence, 'native_raw_hex', ''):
+        raise ValueError('Native Save requires a preset loaded from a binary .unosyp file')
+    raw = bytes.fromhex(sequence.native_raw_hex)
+    native = getattr(sequence, 'native_automation', {}) or {}
+    entries = native.get('entries', [])
+    resolved = {(int(item.get('step') or 0), item.get('parameter')) for item in entries
+                if item.get('parameter') and item.get('step')}
+    values = {}
+    for item in entries:
+        step = int(item.get('step') or 0)
+        parameter = item.get('parameter')
+        lane_name = PARAMETER_TO_LANE.get(parameter)
+        if not lane_name or not 1 <= step <= 64:
+            continue
+        lane = next((line for line in sequence.automation
+                     if line.get('parameter') == lane_name), None)
+        lane_values = lane.get('values', []) if lane else []
+        values[(step, parameter)] = lane_values[step - 1] if step <= len(lane_values) else None
+    # A newly drawn point has no native Selection metadata and must not be
+    # silently omitted from a supposedly native save.
+    reverse = {lane: native_name for native_name, lane in PARAMETER_TO_LANE.items()}
+    for lane in sequence.automation:
+        parameter = reverse.get(lane.get('parameter'))
+        if not parameter:
+            continue
+        for index, value in enumerate(lane.get('values', [])[:64], 1):
+            if value is not None and (index, parameter) not in resolved:
+                raise ValueError(f'Cannot add unresolved native target: Step {index} {parameter}')
+    result = write_resolved_values(raw, values)
+    return encode_sequence_length(result, int(sequence.length))

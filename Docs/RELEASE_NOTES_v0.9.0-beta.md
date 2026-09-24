@@ -19,7 +19,10 @@ The current project's full FIX2 snapshot is the source of truth. Archived/refere
 - MIDI CLOCK Off / MIDI MASTER. USB clock and PLAY/STOP retain the existing implementation.
 - SEQ ON/OFF has no confirmed official command; no new command was added.
 - Preset 2 0x29 anomaly remains unresolved. STORE and DEPLOY permanent writes remain locked.
-- Editor saves are JSON .unosyp files, not an implementation of the official binary writer or hardware STORE.
+- New editor-created presets use the editor JSON document. A loaded official
+  binary `.unosyp` remains binary on `SAVE` / `SAVE AS`; resolved native Step
+  Automation values are written without changing its target set. Hardware
+  STORE remains a separate locked operation.
 - Python 3.12+ and Pillow; Windows for WinMM MIDI.
 
 ## Validation

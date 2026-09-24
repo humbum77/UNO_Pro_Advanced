@@ -1,6 +1,7 @@
 """Check the application reader on variable-page and legacy containers."""
 import json
 import struct
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -9,11 +10,15 @@ from uno_step_automation_decoder import MASTER_PAYLOAD
 from uno_step_automation_decoder import decode as decode_step_automation
 from uno_step_automation_decoder import pack7 as canonical_pack7
 from uno_step_automation_decoder import roundtrip_binary
+from uno_step_automation_decoder import pages as automation_pages
+from uno_step_automation_decoder import write_resolved_values
+from uno_step_automation_decoder import decode_native_value,encode_native_value
 from unosyp_seq_decoder import decode_payload_note_steps
 from unosyp_seq_decoder import parse_unosyp
 import storage
 from app import App
-from data_model import Sequence
+from data_model import Preset,Sequence
+from native_automation import apply_decoded_to_sequence
 from hardware_seq_0x29 import apply_to_sequence
 
 
@@ -48,6 +53,19 @@ class AutomationIntegrationTest(unittest.TestCase):
         for sample in samples:
             self.assertEqual(unpack7(canonical_pack7(sample)),sample)
 
+    def test_confirmed_native_value_codecs(self):
+        cases=(('ENV1',-21),('SPACING',64),('TUNE1',-12.0),
+               ('LFO1',65.0),('CUTOFF1',101),('DRIVE',127),
+               ('REVERB',100))
+        for name,value in cases:
+            raw=encode_native_value(name,value)
+            self.assertEqual(decode_native_value(name,raw),value)
+        with self.assertRaisesRegex(ValueError,'wave scale'):
+            encode_native_value('WAVE1',2)
+        for boundary in (0,512):
+            with self.assertRaisesRegex(ValueError,'boundary'):
+                encode_native_value('CUTOFF1',boundary)
+
     def test_drive_delay_order_variants_are_semantically_equal(self):
         fixtures={'c8':'DRIVE32_DELAY31_REVERSE','c0':'DRIVE32_DELAY31_CANONICAL'}
         decoded=[]
@@ -67,6 +85,58 @@ class AutomationIntegrationTest(unittest.TestCase):
             decoded.append(item)
         self.assertEqual(decoded[0]['values_hex'],decoded[1]['values_hex'])
         self.assertNotEqual(decoded[0]['selection_hex'],decoded[1]['selection_hex'])
+
+    def test_native_writer_changes_values_and_preserves_selection_and_cores(self):
+        logical=[bytes.fromhex('0102c0201f'),bytes.fromhex('201f'),
+                 bytes.fromhex('201f'),bytes.fromhex('201f')]
+        blob=bytearray(297)
+        for extension in logical:
+            body=bytes(range(192))+canonical_pack7(extension)
+            blob+=struct.pack('<I',len(body))+body
+        source=bytes(blob)
+        result=write_resolved_values(source,{(1,'DRIVE'):64,(1,'DELAY'):50})
+        before=automation_pages(source);after=automation_pages(result)
+        self.assertEqual(after[0]['extension'],bytes.fromhex('0102c04032'))
+        self.assertEqual([p['extension'] for p in after[1:]],
+                         [bytes.fromhex('4032')]*3)
+        self.assertEqual(source[:297],result[:297])
+        # Repacking must leave every page core byte-for-byte intact.
+        def cores(data):
+            offset=297;items=[]
+            for _ in range(4):
+                length=struct.unpack_from('<I',data,offset)[0]
+                items.append(data[offset+4:offset+4+192]);offset+=4+length
+            return items
+        self.assertEqual(cores(source),cores(result))
+
+    def test_native_writer_rejects_target_set_mutation(self):
+        blob=bytearray(297)
+        for extension in (bytes.fromhex('0102c0201f'),bytes.fromhex('201f'),
+                          bytes.fromhex('201f'),bytes.fromhex('201f')):
+            body=bytes(192)+canonical_pack7(extension)
+            blob+=struct.pack('<I',len(body))+body
+        source=bytes(blob)
+        with self.assertRaisesRegex(ValueError,'cannot add unresolved'):
+            write_resolved_values(source,{(1,'REVERB'):50})
+        with self.assertRaisesRegex(ValueError,'cannot delete'):
+            write_resolved_values(source,{(1,'DRIVE'):None})
+
+    def test_save_as_keeps_binary_unosyp_and_writes_lane_values(self):
+        blob=bytearray(297)
+        for extension in (bytes.fromhex('0102c0201f'),bytes.fromhex('201f'),
+                          bytes.fromhex('201f'),bytes.fromhex('201f')):
+            body=bytes(192)+canonical_pack7(extension)
+            blob+=struct.pack('<I',len(body))+body
+        source=bytes(blob);sequence=Sequence();sequence.native_raw_hex=source.hex()
+        apply_decoded_to_sequence(sequence,decode_step_automation(source))
+        next(x for x in sequence.automation if x['parameter']=='DRIVE AMOUNT')['values'][0]=64
+        next(x for x in sequence.automation if x['parameter']=='DELAY AMOUNT')['values'][0]=50
+        with tempfile.TemporaryDirectory() as folder:
+            target=Path(folder)/'native.unosyp'
+            storage.save_working_preset(Preset(sequence=sequence),target)
+            saved=target.read_bytes()
+        self.assertFalse(saved.lstrip().startswith(b'{'))
+        self.assertEqual(automation_pages(saved)[0]['extension'].hex(),'0102c04032')
 
     def test_controlled_single_pair_gap_and_master7_profiles(self):
         root=Path(__file__).parents[2]

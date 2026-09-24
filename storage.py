@@ -95,7 +95,11 @@ def save_preset(preset,category=None):
     PRESETS.mkdir(parents=True,exist_ok=True)
     p=PRESETS/(_safe(preset.name)+'.unosyp');i=2
     while p.exists():p=PRESETS/f'{_safe(preset.name)} {i}.unosyp';i+=1
-    preset.save(p);invalidate_preset_cache();return p
+    if getattr(preset.sequence,'native_raw_hex',''):
+        save_working_preset(preset,p)
+    else:
+        preset.save(p)
+    invalidate_preset_cache();return p
 
 def load_preset(path):
     d=json.loads(Path(path).read_text(encoding='utf-8'));sd=d.get('sequence',{});seq=Sequence(length=int(sd.get('length',16)),direction=sd.get('direction','Forward'),transpose=int(sd.get('transpose',0)))
@@ -225,19 +229,33 @@ def set_preset_metadata(path,meta):
     d=_load_metadata_db();entry={'favorite':bool(meta.get('favorite',False)),'colors':sorted(set(int(i) for i in meta.get('colors',[]) if 0<=int(i)<7))};order=meta.get('order',None);entry['order']=int(order) if isinstance(order,(int,float)) else None;d[_metadata_key(path)]=entry;_save_metadata_db(d)
 
 def save_working_preset(preset,path):
-    """Atomic editor JSON save; never convert an existing official binary file."""
+    """Atomically save native sources as native and editor documents as JSON."""
     from dataclasses import asdict
     path=Path(path)
-    if path.exists():
+    native=False
+    raw_hex=getattr(preset.sequence,'native_raw_hex','')
+    if raw_hex:
         try:
-            existing=json.loads(path.read_text(encoding='utf-8'))
-            if not isinstance(existing,dict) or 'sequence' not in existing:raise ValueError()
-        except (UnicodeError,ValueError):
-            raise ValueError('This is not an editor JSON preset. Use Save As with a new filename.')
-    text=json.dumps(asdict(preset),ensure_ascii=False,indent=2)
+            from uno_step_automation_decoder import pages as native_pages
+            native_pages(bytes.fromhex(raw_hex));native=True
+        except (TypeError,ValueError):
+            native=False
+    if path.exists():
+        try:existing=path.read_bytes()
+        except OSError:existing=b''
+        try:document=json.loads(existing.decode('utf-8-sig'))
+        except (UnicodeError,json.JSONDecodeError):document=None
+        existing_native=not (isinstance(document,dict) and 'sequence' in document)
+        if existing and existing_native!=native:
+            raise ValueError('Refusing to replace a native preset with JSON or JSON with native data.')
+    if native:
+        from native_automation import write_sequence_automation
+        payload=write_sequence_automation(preset.sequence)
+    else:
+        payload=json.dumps(asdict(preset),ensure_ascii=False,indent=2).encode('utf-8')
     fd,tmp=tempfile.mkstemp(prefix=path.name+'.',suffix='.tmp',dir=str(path.parent))
     try:
-        with os.fdopen(fd,'w',encoding='utf-8') as f:f.write(text);f.flush();os.fsync(f.fileno())
+        with os.fdopen(fd,'wb') as f:f.write(payload);f.flush();os.fsync(f.fileno())
         os.replace(tmp,path)
     finally:
         if os.path.exists(tmp):os.unlink(tmp)

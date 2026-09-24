@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Canonical read-only UNO Synth Pro Step Automation decoder.
+"""Canonical UNO Synth Pro Step Automation decoder and guarded native writer.
 
 Factory ``.unosyp`` files and hardware 0x29 pages share the same extension
 grammar. Unknown patterns retain raw bytes; target names are never guessed.
+Writing is enabled only for targets resolved from the source preset.
 """
 from __future__ import annotations
 
@@ -309,7 +310,67 @@ def _factory_cutoff1_entry(record: dict) -> dict | None:
     return {"name": "CUTOFF1", "native_hex": raw.hex(),
             "native_unsigned": value, "native_signed": None,
             "value": value + 1, "step": record["step"],
+            "payload_offset": 0,
             "confidence": "validated factory multi-step layout"}
+
+
+def decode_native_value(name: str, raw: bytes):
+    """Convert confirmed native automation values to editor units."""
+    raw = bytes(raw)
+    if name.startswith("TUNE"):
+        return int.from_bytes(raw, "big", signed=True) / 100.0
+    if name.startswith("LFO"):
+        return int.from_bytes(raw, "big") / 100.0
+    if name.startswith("CUTOFF"):
+        return int.from_bytes(raw, "big") + 1
+    if name in ("ENV1", "ENV2", "SPACING"):
+        value = raw[0]
+        if value <= 0x40:
+            return value
+        if value >= 0xC1:
+            return value - 0x100
+        raise ValueError(f"reserved bipolar value for {name}: 0x{value:02x}")
+    return int.from_bytes(raw, "big")
+
+
+def encode_native_value(name: str, value) -> bytes:
+    """Encode an editor value using only confirmed native value codecs."""
+    if name not in PARAMETERS:
+        raise ValueError(f"unsupported native automation parameter: {name}")
+    width, _ = PARAMETERS[name]
+    if name.startswith("WAVE"):
+        raise ValueError(f"{name} writer is locked: native wave scale is unresolved")
+    if name.startswith("TUNE"):
+        native = round(float(value) * 100)
+        if not -2400 <= native <= 2400:
+            raise ValueError(f"{name} must be between -24 and +24 semitones")
+        return int(native).to_bytes(2, "big", signed=True)
+    if name.startswith("LFO"):
+        native = round(float(value) * 100)
+        if not 1 <= native <= 10000:
+            raise ValueError(f"{name} must be between 0.01 and 100 Hz")
+        return int(native).to_bytes(2, "big")
+    if name.startswith("CUTOFF"):
+        ui = int(value)
+        if ui in (0, 512):
+            raise ValueError(f"{name} boundary {ui} is not writer-confirmed")
+        if not 1 <= ui <= 511:
+            raise ValueError(f"{name} must be between 1 and 511")
+        return (ui - 1).to_bytes(2, "big")
+    if name in ("ENV1", "ENV2", "SPACING"):
+        native = int(value)
+        if not -63 <= native <= 64:
+            raise ValueError(f"{name} must be between -63 and +64")
+        return bytes((native if native >= 0 else native + 256,))
+    limits = {
+        "LEVEL1": 100, "LEVEL2": 100, "LEVEL3": 100,
+        "RES1": 127, "RES2": 127, "DRIVE": 127,
+        "MOD": 100, "DELAY": 100, "REVERB": 100, "NOISE": 127,
+    }
+    native = int(value)
+    if name not in limits or not 0 <= native <= limits[name]:
+        raise ValueError(f"{name} value is outside the confirmed writer range")
+    return native.to_bytes(width, "big")
 
 
 def decode(data: bytes) -> dict:
@@ -334,8 +395,12 @@ def decode(data: bytes) -> dict:
                 "profile": None, "parameters": [], "status": "empty"}
     records = _decode_page_records(parsed)
     if records is not None and len(records) > 1:
-        parameters = [entry for record in records
-                      if (entry := _factory_cutoff1_entry(record)) is not None]
+        parameters = []
+        for record_index, record in enumerate(records):
+            entry = _factory_cutoff1_entry(record)
+            if entry is not None:
+                entry["record_index"] = record_index
+                parameters.append(entry)
         return {
             "step": records[0]["step"], "count": sum(r["count"] for r in records),
             "selection_hex": records[0]["selection"].hex(),
@@ -372,6 +437,7 @@ def decode(data: bytes) -> dict:
         result["profile"] = label
         result["status"] = "exact match to 2026-09-22 capture profile"
         result["parameters"] = []
+        payload_offset = 0
         for name, value in entries:
             width, signed = PARAMETERS[name]
             unsigned = int.from_bytes(value, "big")
@@ -379,11 +445,78 @@ def decode(data: bytes) -> dict:
             result["parameters"].append({
                 "name": name, "native_hex": value.hex(), "native_width": width,
                 "native_unsigned": unsigned, "native_signed": signed_value,
-                "value": signed_value if signed else unsigned,
+                "value": decode_native_value(name, value),
+                "record_index": 0, "payload_offset": payload_offset,
             })
+            payload_offset += width
     elif len(known) > 1:
         result["profile_candidates"] = [label for label, _ in known]
         result["status"] = "ambiguous exact capture match; targets left unresolved"
+    return result
+
+
+def write_resolved_values(data: bytes, values: dict[tuple[int, str], object]) -> bytes:
+    """Write values for already-resolved targets without inventing Selection.
+
+    ``values`` is keyed by ``(one_based_step, canonical_parameter_name)``.
+    The target set, record headers, Selection/Alignment bytes, state and page
+    cores are retained from the source preset.  Adding or deleting a target is
+    rejected because it would require unverified target-selection synthesis.
+    """
+    source = bytes(data)
+    decoded = decode(source)
+    parsed = pages(source)
+    records = _decode_page_records(parsed)
+    if records is None:
+        # All confirmed single-step profiles use the mirrored layout.
+        if not decoded.get("profile") or decoded.get("step") is None:
+            raise ValueError("native automation targets are not resolved")
+        first = parsed[0]["extension"]
+        count = decoded["count"]
+        selection_length = (count + 7) // 8
+        records = [{"step": decoded["step"], "count": count,
+                    "selection": first[2:2 + selection_length],
+                    "payload": first[2 + selection_length:]}]
+    resolved = {(int(item.get("step", decoded.get("step") or 0)), item["name"]): item
+                for item in decoded.get("parameters", [])}
+    requested = dict(values)
+    unknown = set(requested) - set(resolved)
+    if unknown:
+        labels = ", ".join(f"Step {step} {name}" for step, name in sorted(unknown))
+        raise ValueError(f"cannot add unresolved native automation target(s): {labels}")
+    changed = [bytearray(record["payload"]) for record in records]
+    for key, value in requested.items():
+        if value is None:
+            raise ValueError(f"cannot delete native automation target: Step {key[0]} {key[1]}")
+        item = resolved[key]
+        if value == item.get("value"):
+            continue
+        record_index = int(item.get("record_index", 0))
+        offset = int(item.get("payload_offset", 0))
+        encoded = encode_native_value(item["name"], value)
+        old_width = len(bytes.fromhex(item["native_hex"]))
+        if len(encoded) != old_width or offset + old_width > len(changed[record_index]):
+            raise ValueError("native automation value width changed")
+        changed[record_index][offset:offset + old_width] = encoded
+
+    extensions = []
+    prior_values = b""
+    for page_index in range(4):
+        local = bytearray()
+        for record_index, record in enumerate(records):
+            if (record["step"] - 1) // 16 != page_index:
+                continue
+            local += bytes((record["step"], record["count"]))
+            local += record["selection"]
+            local += changed[record_index]
+        extensions.append(prior_values + bytes(local))
+        prior_values += b"".join(bytes(changed[index]) for index, record in enumerate(records)
+                                 if (record["step"] - 1) // 16 == page_index)
+    result = replace_extensions(source, extensions)
+    # Structural verification is independent of the exact-value profile table.
+    rebuilt = pages(result)
+    if [page["extension"] for page in rebuilt] != extensions:
+        raise ValueError("native automation writer verification failed")
     return result
 
 
