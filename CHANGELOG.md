@@ -1,5 +1,12 @@
 # Changelog
 
+## Step Automation codec follow-up — 2026-09-24
+
+- Recognized equivalent DRIVE/DELAY order variants `C0/C8`.
+- Added inverse `pack7` and a byte-exact native extension writer primitive.
+- Validated binary round-trip on 450 `.unosyp` files without mismatches.
+- Arbitrary target generation and hardware STORE remain explicitly partial.
+
 ## 0.9.7-beta2 hardware automation fix — 2026-09-23
 
 - Added one restricted read-only Step Automation decoder shared by factory

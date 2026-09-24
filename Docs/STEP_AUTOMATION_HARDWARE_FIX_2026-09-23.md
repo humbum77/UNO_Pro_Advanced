@@ -1,5 +1,18 @@
 # Step Automation hardware integration — 2026-09-23
 
+## Controlled order addendum — 2026-09-24
+
+The controlled DRIVE/DELAY pair closes one ambiguity in the ordered value
+stream. `DELAY=31 -> DRIVE=32` and `DRIVE=32 -> DELAY=31` produce different
+alignment/control bytes (`C8` and `C0`) but the same native payload `20 1F`.
+The value order is canonical (`DRIVE`, then `DELAY`), not knob-recording order;
+both signatures now decode to the same two lane values.
+
+The codec now includes inverse continuous `pack7` and a native page-extension
+round-trip primitive. A 450-file corpus rebuilt byte-for-byte with zero
+mismatches. This is the binary writer foundation; arbitrary unknown target
+selection generation and hardware STORE remain PARTIAL.
+
 ## Result
 
 UNO Pro Advanced now uses one read-only Step Automation decoder for both factory `.unosyp` files and hardware SysEx `0x29` sequence pages. The hardware adapter passes all four page payloads to `uno_step_automation_decoder.decode_page_payloads()`; it does not maintain a second target resolver.
@@ -35,4 +48,3 @@ Corrected artifact: `UNO_Pro_Advanced_v0.9.7-beta2-HARDWARE-AUTOMATION-FIX.zip`.
 SHA-256: `3e79c1c36908263b135fca2cd83af70f754d0cec4b6c978ed35cd7abd2149e5c`.
 
 The earlier `CANONICAL-STEP-DECODER` artifact is invalid and must not be used.
-

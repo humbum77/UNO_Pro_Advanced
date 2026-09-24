@@ -78,6 +78,14 @@ CONTROLLED_PAIRS = (
     ("GAP_RES1_RES2", "00", (("RES1", "2c"), ("RES2", "37"))),
     ("GAP_ENV1_ENV2", "00", (("ENV1", "eb"), ("ENV2", "15"))),
     ("GAP_DRIVE_DELAY", "00", (("DRIVE", "42"), ("DELAY", "58"))),
+    # The value stream is canonical (DRIVE, DELAY) even when the knobs were
+    # recorded in the opposite order. Control retains a history-dependent
+    # variant, so both forms map to the same semantic pair.
+    ("DRIVE32_DELAY31_CANONICAL", "c0", (("DRIVE", "20"), ("DELAY", "1f"))),
+    ("DRIVE32_DELAY31_REVERSE", "c8", (("DRIVE", "20"), ("DELAY", "1f"))),
+    ("DRIVE31_DELAY31_FORWARD", "a0", (("DRIVE", "1f"), ("DELAY", "1f"))),
+    ("DRIVE31_DELAY31_REVERSE", "80", (("DRIVE", "1f"), ("DELAY", "1f"))),
+    ("DRIVE31_DELAY31_STEP2", "00", (("DRIVE", "1f"), ("DELAY", "1f"))),
 )
 # These variants remove precisely one native value. The control bytes are
 # included in the exact-match key, so coincidental matching cannot name lanes.
@@ -111,6 +119,49 @@ def unpack7(data: bytes) -> bytes:
     if value:  # remaining padding bits must be zero
         raise ValueError("nonzero extension padding")
     return bytes(out)
+
+
+def pack7(data: bytes) -> bytes:
+    """Pack logical bytes into the native continuous 7-bit-safe transport."""
+    value = bits = 0
+    out = bytearray()
+    for byte in bytes(data):
+        value |= byte << bits
+        bits += 8
+        while bits >= 7:
+            out.append(value & 0x7F)
+            value >>= 7
+            bits -= 7
+    if bits:
+        out.append(value & 0x7F)
+    return bytes(out)
+
+
+def replace_extensions(data: bytes, logical_extensions: list[bytes]) -> bytes:
+    """Replace four native extensions while preserving state and page cores."""
+    if len(logical_extensions) != 4:
+        raise ValueError("expected four logical automation extensions")
+    parsed = pages(data)
+    offset = PAGE_OFFSET
+    output = bytearray(data[:PAGE_OFFSET])
+    for logical in logical_extensions:
+        length = struct.unpack_from("<I", data, offset)[0]
+        body_start = offset + 4
+        core = data[body_start:body_start + CORE_LENGTH]
+        body = core + pack7(bytes(logical))
+        output += struct.pack("<I", len(body)) + body
+        offset = body_start + length
+    assert len(parsed) == 4
+    return bytes(output)
+
+
+def roundtrip_binary(data: bytes) -> bytes:
+    """Rebuild a native file through the extension codec without data loss."""
+    parsed = pages(data)
+    rebuilt = replace_extensions(data, [page["extension"] for page in parsed])
+    if rebuilt != bytes(data):
+        raise ValueError("native automation round-trip is not byte-exact")
+    return rebuilt
 
 
 def pages(data: bytes) -> list[dict]:
@@ -371,4 +422,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

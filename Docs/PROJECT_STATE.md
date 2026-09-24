@@ -2,6 +2,15 @@
 
 Дата фиксации: 2026-09-23.
 
+## Step Automation addendum — 2026-09-24
+
+- DRIVE/DELAY values have canonical order independent of knob-recording order:
+  `C0/C8 -> 20 1F` means `DRIVE=32, DELAY=31`.
+- Exact inverse `pack7` and byte-exact native extension round-trip are added.
+- 450 available native `.unosyp` files round-trip with zero mismatches.
+- Arbitrary Parameter Selection writer remains PARTIAL; no hardware STORE
+  claim is made.
+
 ## Основное правило ведения проекта
 
 Документация является основой проекта и первичным источником истины. Исследования, подтверждённые структуры и алгоритмы, решения, ограничения и результаты тестов фиксируются до выпуска сборки или одновременно с изменением кода. Недокументированное изменение не считается завершённым. При расхождении источников продолжение работы выполняется по актуальной документации с явным сохранением статусов подтверждения.

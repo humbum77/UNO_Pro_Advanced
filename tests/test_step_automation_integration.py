@@ -7,6 +7,8 @@ from pathlib import Path
 from native_automation import read_automation
 from uno_step_automation_decoder import MASTER_PAYLOAD
 from uno_step_automation_decoder import decode as decode_step_automation
+from uno_step_automation_decoder import pack7 as canonical_pack7
+from uno_step_automation_decoder import roundtrip_binary
 from unosyp_seq_decoder import decode_payload_note_steps
 from unosyp_seq_decoder import parse_unosyp
 import storage
@@ -40,6 +42,32 @@ def variable_file(payload=MASTER_PAYLOAD):
 
 
 class AutomationIntegrationTest(unittest.TestCase):
+    def test_pack7_is_exact_inverse(self):
+        from uno_step_automation_decoder import unpack7
+        samples=(b'',bytes(range(1,40)),bytes.fromhex('0102c8201f'),MASTER_PAYLOAD)
+        for sample in samples:
+            self.assertEqual(unpack7(canonical_pack7(sample)),sample)
+
+    def test_drive_delay_order_variants_are_semantically_equal(self):
+        fixtures={'c8':'DRIVE32_DELAY31_REVERSE','c0':'DRIVE32_DELAY31_CANONICAL'}
+        decoded=[]
+        for selection,profile in fixtures.items():
+            payload=bytes.fromhex('201f')
+            blob=bytearray(297)
+            for page in range(4):
+                logical=(bytes.fromhex('0102'+selection)+payload if page==0 else payload)
+                body=bytes(192)+canonical_pack7(logical)
+                blob+=struct.pack('<I',len(body))+body
+            native=bytes(blob)
+            item=decode_step_automation(native)
+            self.assertEqual(item['profile'],profile)
+            self.assertEqual([(x['name'],x['native_hex']) for x in item['parameters']],
+                             [('DRIVE','20'),('DELAY','1f')])
+            self.assertEqual(roundtrip_binary(native),native)
+            decoded.append(item)
+        self.assertEqual(decoded[0]['values_hex'],decoded[1]['values_hex'])
+        self.assertNotEqual(decoded[0]['selection_hex'],decoded[1]['selection_hex'])
+
     def test_controlled_single_pair_gap_and_master7_profiles(self):
         root=Path(__file__).parents[2]
         fixtures={
@@ -159,4 +187,3 @@ class AutomationIntegrationTest(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
-
