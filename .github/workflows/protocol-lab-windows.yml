@@ -1,0 +1,50 @@
+name: Build Protocol Lab Windows # capture-fix
+
+on:
+  push:
+    branches:
+      - "research/protocol-lab"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "ProtocolLab/**"
+      - "tests/test_protocol_lab.py"
+      - "tests/test_unosyp_probe.py"
+      - "tests/test_state_investigator.py"
+      - ".github/workflows/protocol-lab-windows.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r ProtocolLab/requirements.txt
+          python -m pip install pyinstaller
+      - name: Unit tests
+        shell: pwsh
+        run: python -m unittest tests.test_protocol_lab tests.test_unosyp_probe tests.test_state_investigator
+      - name: Build EXE
+        shell: pwsh
+        run: pyinstaller --noconfirm --clean --onefile --windowed --collect-all mido --collect-all rtmidi --hidden-import mido.backends.rtmidi --name UNO_Synth_Pro_Protocol_Lab ProtocolLab/protocol_lab.py
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force package | Out-Null
+          Copy-Item dist/UNO_Synth_Pro_Protocol_Lab.exe package/
+          Copy-Item ProtocolLab/README.md package/
+          Copy-Item Docs/PROTOCOL_LAB_REPORT.md package/
+          Compress-Archive -Path package/* -DestinationPath UNO_Synth_Pro_Protocol_Lab_Windows.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: UNO-Synth-Pro-Protocol-Lab-Windows
+          path: UNO_Synth_Pro_Protocol_Lab_Windows.zip
+          if-no-files-found: error
