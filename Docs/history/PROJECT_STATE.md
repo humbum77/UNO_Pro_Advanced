@@ -1,0 +1,151 @@
+# UNO Pro Advanced — состояние проекта
+
+Дата фиксации: 2026-09-23.
+
+## Native writer — 2026-09-24
+
+- Для загруженного binary `.unosyp` кнопки `SAVE` / `SAVE AS` записывают
+  binary `.unosyp`, а не JSON-документ редактора.
+- Writer меняет значения уже разрешённых targets, пересобирает cumulative
+  extensions всех четырёх страниц и сохраняет state/core/Selection/opaque
+  bytes без изменений.
+- Подтверждены и включены value codecs: direct 1-byte, bipolar ENV/SPACING,
+  TUNE cents, LFO centi-Hz и проверенная внутренняя область CUTOFF.
+- Добавление/удаление target, WAVE и CUTOFF boundaries 0/512 блокируются с
+  явной ошибкой. Это защитная граница: формула синтеза нового Selection из
+  произвольного набора targets аппаратно не подтверждена.
+
+## Step Automation addendum — 2026-09-24
+
+- DRIVE/DELAY values have canonical order independent of knob-recording order:
+  `C0/C8 -> 20 1F` means `DRIVE=32, DELAY=31`.
+- Exact inverse `pack7` and byte-exact native extension round-trip are added.
+- 450 available native `.unosyp` files round-trip with zero mismatches.
+- Arbitrary Parameter Selection writer remains PARTIAL; no hardware STORE
+  claim is made.
+
+## Основное правило ведения проекта
+
+Документация является основой проекта и первичным источником истины. Исследования, подтверждённые структуры и алгоритмы, решения, ограничения и результаты тестов фиксируются до выпуска сборки или одновременно с изменением кода. Недокументированное изменение не считается завершённым. При расхождении источников продолжение работы выполняется по актуальной документации с явным сохранением статусов подтверждения.
+
+## Защищённый компонент: анимация и геометрия ADSR
+
+Статус: **LOCKED / НЕ ИЗМЕНЯТЬ**.
+
+Новая анимация огибающей v0.9.7-beta и внутренняя геометрия отображаемой ADSR-кривой защищены запретом на изменения без отдельного указания пользователя. Зафиксированы S–R `0.26` (+30%), расчёты координат/времени/уровня, кривые, отрисовка, маркеры, live-индикатор, Note On/Note Off и drag/edit-поведение. Контейнеры FILTER ENV/AMP ENV, положение всего блока и окружающую компоновку SYNTH разрешено адаптировать при неизменной ADSR-кривой и анимации.
+
+## Актуальная линия
+
+- Основной проект: `D:\UNO\project_unified`, ветка `main`.
+- Текущая версия: **v0.9.7-beta**, кумулятивно после v0.9.6-beta.
+- База main: `51906bc1a40a636441c98f10794113d696ffc180`; Live Creator: `e2b0a977d194fdf28e40eaac73b1eaae8de525b0`.
+- Интеграционный merge: `2a63c2684c89881003bdd015cc24a58dbde11e95`. Его прежнее название v0.10.0-alpha было ошибочным и исправляется отдельным commit без переписывания истории.
+- Версия standalone Live Creator v0.6-alpha не меняет beta-статус основной программы.
+- Отдельный worktree Live-Creator и его пользовательские материалы не изменяются.
+
+## Тестовая линия адаптивного UI
+
+- Активная ветка разработки: `test/v0.9.7-next`, база — зафиксированный релиз v0.9.7-beta.
+- `main` и `release/v0.9.7-beta` являются резервными точками и в рамках UI-эксперимента не изменяются.
+- Реализуется поэтапный responsive layout без боковых полей на стандартных 16:9 экранах. Контрольные размеры: 1366×768, 1600×900, 1920×1080, 2560×1440.
+- Этап 1: добавлен чистый расчёт viewport и гибких колонок; адаптируются topbar, SYNTH, Sequencer, Library, Settings, Live Creator и экранная клавиатура.
+- SYNTH использует три пропорционально расширяемые зоны: OSC, FILTER/LFO/ENV и FX. Мод-матрица расширяется по доступной ширине. ADSR-графики сохраняют исходные размеры, внутреннюю геометрию и анимацию; перемещаются только их контейнеры и положение на странице.
+- Добавлены unit-проверки layout-математики и исходного кода защищённых функций огибающей.
+- Layout unit-тесты на четырёх стандартных разрешениях, адаптивные зоны SYNTH и lock-тест огибающей: **SOFTWARE PASS**. Полная регрессия: 61/63 PASS; остаются два ранее документированных устаревших ожидания `test_safety_unchanged` и `test_theme`, не связанные с UI-изменением. Визуальная проверка реального Tk-окна: **UNVERIFIED** из-за отсутствия display/Xvfb в среде.
+- Пользователь разрешил тестовую сборку. Целевой артефакт: `UNO_Pro_Advanced_v0.9.7-next.zip`, канал `test/v0.9.7-next`; `VERSION` приложения остаётся `0.9.7-beta`.
+- Тестовая сборка проверена пользователем: адаптивная компоновка получила **USER VISUAL PASS**.
+- Пользователь разрешил fast-forward перенос тестовой линии в `main` и закрытие `test/v0.9.7-next`. После интеграции актуальной рабочей веткой снова является `main`; `release/v0.9.7-beta` сохраняется как резервная точка.
+
+## Реализовано в интеграции
+
+Встроенный LIVE: 64 независимые песни, Timeline 32+32, LENGTH 1–64 без удаления блоков, скругление 4px, независимый выбранный и проигрываемый контекст, clipboard/markers/Loop/pulse.
+Sequencer: Dupl с удвоением длины и копированием декодированной automation, прежний Fill.
+Automation: parameter selector, индивидуальная metadata шкал и read-only native container reader.
+Dark/Light темы, неизменные transport green/red, Settings/Theme icons. Служебные данные — `%LOCALAPPDATA%\UnoLive`, не LOCAL PRESETS.
+
+## Изменения v0.9.7-beta
+
+- Локальные `.unosyp` и аппаратные страницы SysEx `0x29` используют общий декодер секвенсора.
+- Gate, Accent и TIE полностью декодируются и переносятся в одну модель `Step` независимо от источника данных.
+- Аппаратный приём собирает страницы 0–4, необходимые для подтверждённого декодирования секвенсора.
+- Добавлена новая анимация огибающей; визуальный отрезок S–R увеличен на 30%. Компонент после утверждения переведён в статус LOCKED.
+- Название окна, экран About и файл `VERSION` синхронизированы с **0.9.7-beta**.
+
+## Проверки и границы подтверждения
+
+57 актуальных unittest повторно прошли при исправлении версии; compile/import и version-only runtime diff также PASS. Два Tk GUI smoke-теста и packaged main проходили до переименования, но повторная проверка beta заблокирована отсутствием прежней Tcl/Tk-папки и отклонённым доступом к установленному Python. Новый GUI/launch PASS не заявляется; требуется повторная проверка после восстановления среды. При автоматическом запуске используется mocked MIDI и временное хранилище.
+На предоставленных файлах из `D:\UNO\materials\test` проверены 6 automation containers и 12 Sequence Length. Это SOFTWARE validation реальных captures, не новое аппаратное испытание.
+Единый декодер Gate/Accent/TIE проверен на 10 контрольных `.unosyp`: результаты локального чтения и эквивалентного аппаратного payload совпадают. Это SOFTWARE PASS на подтверждённых captures; физический обмен с устройством в рамках этой сборки не выполнялся.
+Проверка репозитория перед GitHub push: compileall PASS, `git diff --check` PASS, версия/огибающая/документная блокировка PASS, parity Gate/Accent/TIE на 10 captures PASS. Из 57 исторических unittest прошли 55; два старых теста конфликтуют с утверждёнными изменениями v0.9.7-beta: `test_safety_unchanged` запрещает обновление `hardware_seq_0x29.py`, а `test_theme` ожидает прежний Light accent swap. Код под эти устаревшие ожидания не откатывался.
+Исторические аппаратные результаты основной beta-линии не являются HARDWARE PASS новой интеграционной сборки.
+Старый Docs/test_beta.py содержит несовместимые проверки отсутствующих в исходной базе API и старого SONG UI; подробности в отчёте.
+Финальный ручной visual PASS не получен из-за ограничения инструмента.
+
+## PARTIAL / UNKNOWN / UNVERIFIED
+
+- Native automation: parameter/value/step packing и writer PARTIAL; byte495 и аппаратный MAX entries UNKNOWN. Не устанавливать MAX=17.
+- Dupl блокируется при opaque native automation, чтобы не терять события.
+- Tune hybrid, Wave normalization, mode-aware LFO и raw CC → device-unit conversion не дополняются догадками.
+- Live playback без MIDI/звука/controllers/hardware SONG writes.
+- Музыкальная длительность EMPTY неизвестна; конфликт markers отменяет edit без объединения через /.
+- STORE/0x28 locked; неизвестный SEQ ON/OFF не изменён.
+- Выборочные исторические ограничения hardware 0x29 не считаются закрытыми этой интеграцией.
+
+## Сборка и отправка
+
+Актуальный артефакт: `UNO_Pro_Advanced_v0.9.7-beta.zip`.
+Source standalone для Python 3.12+, Tkinter, Pillow, не автономный EXE. Source hash — BUILD_COMMIT внутри архива.
+Старую локальную v0.10.0-alpha не публиковать; она сохранена как superseded artifact.
+Push/создание тегов/публикация GitHub Release пока не выполняются. Remote main не удалось проверить из-за отсутствия соединения с GitHub; перед push повторить fetch и ancestry check, не использовать force push.
+
+## Документация
+
+Для v0.9.7-beta актуальны `Docs/RELEASE_NOTES_v0.9.7-beta.md`, `Docs/PROJECT_STATE.md`, `Docs/DECISIONS.md` и `CHANGELOG.md`.
+Этот файл и DECISIONS.md зеркалируются из `D:\UNO\docs` в `D:\UNO\project_unified\Docs`, чтобы общие решения были доступны и на GitHub.
+
+
+## 2026-09-22 — Native Step Automation: актуальное состояние Parameter Selection
+
+Исследование продолжено на чистых multi-lane differential captures. Старые модели, основанные на прямом анализе packed-байтов как 14-bit lane records, сняты.
+
+Подтверждён транспортный слой automation extension:
+- сначала выполняется непрерывный 7→8 bit unpack;
+- после unpack наблюдается структура `Step | Count | Control/Selection | Native value stream`;
+- длина наблюдаемого Control/Selection-блока равна `ceil(Count/8)` байт;
+- Count считает automation entries;
+- native values имеют как минимум 8-bit и 16-bit представления.
+
+Чистый ряд `S0–S4` опроверг простую модель `Control = skip distance`:
+- S0: ENV1+ENV2+SPACING+DRIVE → Count 4, Control `00`, payload `20 20 20 40`;
+- S1: ENV1+SPACING+DRIVE → Count 3, Control `00`, payload `20 20 40`;
+- S2: ENV1+DRIVE → Count 2, Control `00`, payload `20 40`;
+- S3: ENV1+REVERB → Count 2, Control `50`, payload `20 32`;
+- S4: DRIVE+REVERB → Count 2, Control `A8`, payload `40 32`.
+
+Следовательно:
+- Control не является абсолютным Parameter ID;
+- Control не является width bitmap;
+- Control не является самостоятельной presence-mask;
+- Control не является простым кодом количества пропущенных canonical slots;
+- `(Count, Control)` недостаточно для восстановления ParameterSet.
+
+Рабочее направление: побитовое сравнение Page1 с Pages2–4 на S0–S4. В исследованных captures Pages2–4 дают value payload без наблюдаемого отдельного Control/Selection-блока; Page1 содержит дополнительную target-selection информацию. Необходимо отделить биты, объясняемые native values, от target metadata и только после cross-validation реализовывать writer.
+
+Статус Parameter Resolution и writer: **PARTIAL / UNKNOWN**. Полноценный `Step → Parameter → Value` decoder/writer пока не объявлять работающим.
+
+## 2026-09-23 — Step Automation hardware integration
+
+- Добавлен единый ограниченный read-only decoder для заводских `.unosyp` и
+  аппаратных страниц SysEx `0x29`.
+- Hardware adapter теперь переносит распознанные точки в
+  `Sequence.automation`.
+- Regression preset `[053] FAKE 808`: `CUTOFF 1` на шагах
+  6, 7, 11, 23, 27, 54, 55, 59; первые значения 511, 512, 511.
+- Подтверждён предел 18 automation entries на шаг.
+- Неизвестные сочетания сохраняются RAW. Универсальный Parameter Resolution
+  и writer остаются `PARTIAL / UNKNOWN`.
+- Статус — SOFTWARE PASS на предоставленных captured bytes; новый физический
+  HARDWARE PASS не заявляется.
+- Исправленный артефакт:
+  `UNO_Pro_Advanced_v0.9.7-beta2-HARDWARE-AUTOMATION-FIX.zip`.
+  Предыдущий `CANONICAL-STEP-DECODER` недействителен.

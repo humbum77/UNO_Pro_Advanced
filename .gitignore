@@ -1,0 +1,27 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+*.tmp
+*.log
+Docs/test[2-5].unosyp
+.snapshot_chunks/
+SYNC_NOTE.txt
+builds/
+LiveCreatorState.json
+tests/review-*/
+
+# User data and generated release manifests
+*.unosyp
+MANIFEST.json
+builds/
+
+# Superseded pre-global-style backups
+*.pre_global_style_v2
+
+# Editor / OS noise
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini

@@ -1,0 +1,18 @@
+VALIDATION v1.0 STANDALONE SAFE
+
+[OK] Standalone package; no UNO Synth Pro Editor files included.
+[OK] MIDI Clock F8 hidden from capture by default.
+[OK] Active Sense FE hidden from capture by default.
+[OK] Hidden realtime messages are still forwarded.
+[OK] No Tk calls from WinMM callback thread.
+[OK] Forwarding moved to dedicated queue/worker.
+[OK] GUI capture updates are batched.
+[OK] Emergency STOP MIDI button.
+[OK] Ctrl+Shift+Esc bound inside application.
+[OK] Ctrl+Shift+F12 backup shortcut bound inside application.
+[OK] STOP clears pending forward queue and does not auto-restart.
+[OK] Port close happens off Tk main thread.
+[OK] Python syntax compile checked.
+
+NOTE: WinMM runtime cannot be executed/validated in this Linux build environment.
+Final hardware/Windows stability must be tested on the user's Windows machine.
