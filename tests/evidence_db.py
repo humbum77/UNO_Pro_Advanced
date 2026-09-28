@@ -1,17 +1,48 @@
 """Access to the unified evidence database.
 
-The SQLite file under ``tests/fixtures`` is the authoritative record of what
-was observed on the device and what remains unresolved.  It is opened
-read-only: a test run must never be able to alter the evidence.
+The canonical database lives in the evidence environment, not in this
+repository:
+
+    E:\\UNO_Evidence\\databases\\UNO_UNIFIED_NORMALIZED_FINAL_2026-09-29.sqlite
+
+Set ``UNO_EVIDENCE_DB`` to point somewhere else.  A copy under
+``tests/fixtures`` keeps the suite runnable on its own, but it is a snapshot:
+when the two disagree, the environment is right.
+
+The database is always opened read-only: a test run must never be able to alter
+the evidence.
 
 Expected failures are declared here as data rather than as silently skipped
 assertions, so that a newly mis-saved capture shows up as a change in this
 table instead of disappearing into a skip.
 """
+import os
 from pathlib import Path
 import sqlite3
 
-DB_PATH = Path(__file__).resolve().parent / 'fixtures' / 'UNO_UNIFIED_NORMALIZED_FINAL_2026-09-29.sqlite'
+ENV_DB = Path(r'E:\UNO_Evidence\databases\UNO_UNIFIED_NORMALIZED_FINAL_2026-09-29.sqlite')
+FIXTURE_DB = Path(__file__).resolve().parent / 'fixtures' / 'UNO_UNIFIED_NORMALIZED_FINAL_2026-09-29.sqlite'
+
+
+def database_path():
+    override = os.environ.get('UNO_EVIDENCE_DB')
+    if override:
+        return Path(override)
+    if ENV_DB.exists():
+        return ENV_DB
+    return FIXTURE_DB
+
+
+def connect():
+    path = database_path()
+    if not path.exists():
+        raise FileNotFoundError(
+            f'evidence database is missing: {path}\n'
+            f'expected the environment at {ENV_DB}, or set UNO_EVIDENCE_DB')
+    con = sqlite3.connect(f'file:{path}?mode=ro', uri=True)
+    con.row_factory = sqlite3.Row
+    return con
+
 
 # Controlled matrix captures that the database itself does not mark as validated.
 # Matrix.zip is recorded in evidence_exclusions 5/6 as containing mis-saved files;
@@ -21,14 +52,6 @@ UNRESOLVED_MATRIX_CAPTURES = {
     'FiltEnvSus': 'Filter Env Sustain',
     'AmpEnvRel': 'Amp Env Release',
 }
-
-
-def connect():
-    if not DB_PATH.exists():
-        raise FileNotFoundError(f'evidence database is missing: {DB_PATH}')
-    con = sqlite3.connect(f'file:{DB_PATH}?mode=ro', uri=True)
-    con.row_factory = sqlite3.Row
-    return con
 
 
 def matrix_presets(con):
