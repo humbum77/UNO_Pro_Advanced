@@ -123,6 +123,40 @@ def decode_amount(raw):
     return None
 
 
+def decode_file_state(data):
+    """Unpack the 7-bit continuous stream of a .unosyp head into 260 raw bytes."""
+    data = bytes(data)
+    if len(data) < FILE_STATE_SIZE:
+        raise ValueError(f'native .unosyp is too short: {len(data)}')
+    bits = []
+    for value in data[1:FILE_STATE_SIZE]:
+        if value > 0x7F:
+            raise ValueError('native state is not a 7-bit stream')
+        bits.extend((value >> i) & 1 for i in range(7))
+    raw = bytearray((data[0],))
+    for pos in range(0, len(bits), 8):
+        raw.append(sum(bits[pos + i] << i for i in range(8)))
+    if len(raw) != RAW_STATE_SIZE:
+        raise ValueError('invalid native state length')
+    return bytes(raw)
+
+
+def encode_file_state(raw):
+    """Pack 260 raw bytes back into the 297-byte .unosyp state head."""
+    raw = bytes(raw)
+    if len(raw) != RAW_STATE_SIZE:
+        raise ValueError(f'expected {RAW_STATE_SIZE} raw state bytes')
+    bits = []
+    for value in raw[1:]:
+        bits.extend((value >> i) & 1 for i in range(8))
+    packed = bytearray((raw[0],))
+    for pos in range(0, len(bits), 7):
+        packed.append(sum(bits[pos + i] << i for i in range(7)))
+    if len(packed) != FILE_STATE_SIZE:
+        raise AssertionError('native state packing error')
+    return bytes(packed)
+
+
 def encode_amount(value):
     value = int(value)
     if not AMOUNT_MIN <= value <= AMOUNT_MAX:

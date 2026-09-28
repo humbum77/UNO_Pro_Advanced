@@ -25,3 +25,12 @@ builds/
 .idea/
 Thumbs.db
 desktop.ini
+
+# Evidence database: 47 MB binary fixture, tracked by revision rather than by
+# every commit. Keep it out of the index; the file stays on disk for tests.
+# To re-track a new evidence drop, update this line and commit the binary
+# deliberately -- do not let it ride along with source changes.
+tests/fixtures/*.sqlite
+tests/fixtures/*.sqlite-shm
+tests/fixtures/*.sqlite-wal
+tests/fixtures/*.sqlite-journal

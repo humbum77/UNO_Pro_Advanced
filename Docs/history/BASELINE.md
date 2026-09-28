@@ -8,15 +8,19 @@
 
 ```
 python -m compileall -q .                              # PASS
-python -m unittest discover -s tests -p "test_*.py"     # 98 tests
+python -m unittest discover -s tests -p "test_*.py"     # 113 tests
 ```
 
 ## Результат
 
 ```
-Ran 98 tests
+Ran 113 tests
 FAILED (failures=3, errors=1, skipped=4)
 ```
+
+15 тестов добавлены 2026-09-29: `tests/test_matrix_codec.py` проверяет кодек
+на реальных контрольных захватах из `tests/fixtures/UNO_UNIFIED_NORMALIZED_FINAL_2026-09-29.sqlite`.
+Подробности — в `Docs/history/EVIDENCE_BASE.md`.
 
 Подробно:
 
