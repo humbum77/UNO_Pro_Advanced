@@ -23,16 +23,19 @@ MASTER_VALUES = (
 )
 MASTER_PAYLOAD = bytes.fromhex("".join(value for _, value in MASTER_VALUES))
 MAX_ENTRIES_PER_STEP = 18
+# Held-Step Automation order, confirmed by the operator on 2026-09-29.
+# NOISE is automatable and sits between LEVEL3 and CUTOFF1.
 PARAMETERS = {
     "WAVE1": (2, False), "TUNE1": (2, True), "WAVE2": (2, False),
     "TUNE2": (2, True), "WAVE3": (2, False), "TUNE3": (2, True),
     "LEVEL1": (1, False), "LEVEL2": (1, False), "LEVEL3": (1, False),
-    "CUTOFF1": (2, False), "RES1": (1, False), "ENV1": (1, True),
-    "CUTOFF2": (2, False), "RES2": (1, False), "ENV2": (1, True),
-    "SPACING": (1, True), "LFO1": (2, False), "LFO2": (2, False),
-    "DRIVE": (1, False), "MOD": (1, False), "DELAY": (1, False),
-    "REVERB": (1, False), "NOISE": (1, False),
+    "NOISE": (1, False), "CUTOFF1": (2, False), "RES1": (1, False),
+    "ENV1": (1, True), "CUTOFF2": (2, False), "RES2": (1, False),
+    "ENV2": (1, True), "SPACING": (1, True), "LFO1": (2, False),
+    "LFO2": (2, False), "DRIVE": (1, False), "MOD": (1, False),
+    "DELAY": (1, False), "REVERB": (1, False),
 }
+DECODER_PARAMETER_ORDER = tuple(PARAMETERS)
 SINGLE_VALUES = {
     "WAVE1": "0081", "TUNE1": "0032", "WAVE2": "0103", "TUNE2": "ffce",
     "WAVE3": "0182", "TUNE3": "0032", "LEVEL1": "0b", "LEVEL2": "16",

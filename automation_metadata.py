@@ -27,12 +27,24 @@ add(['LEVEL 1','LEVEL 2','LEVEL 3'],'unipolar',0,100)
 add(['TUNE 1','TUNE 2','TUNE 3'],'bipolar',-24,24,'st',('+24 st','0','-24 st'),'PARTIAL: hybrid cents/semitone interpolation unknown')
 add(['LFO 1','LFO 2'],'unipolar',0.01,99,'Hz',('99 Hz','49.5 Hz','0.01 Hz'),'PARTIAL: free-Hz only; sync mapping separate')
 add(['WAVE 1','WAVE 2','WAVE 3'],'unipolar',None,None,labels=('UNKNOWN',),status='PARTIAL: normalized wave scale unknown')
+add(['NOISE'],'unipolar',0,127,status='CONFIRMED parameter UI; held-Step Automation')
 add(['SPACING','ENV AM 1','ENV AM 2'],'bipolar',-64,64)
 add(['DRIVE AMOUNT'],'unipolar',0,127)
-add(['VELOCITY'],'unipolar',1,127)
 add(['MODULATION AMOUNT','DELAY AMOUNT','REVERB AMOUNT'],'unipolar',0,100)
-AUTOMATABLE=tuple(PARAMETERS)
 add(['FM 1','FM 2'],'unipolar',0,100,status='CONFIRMED parameter UI; NOT held-Step Automation')
+add(['VELOCITY'],'unipolar',1,127,status='CONFIRMED step parameter; NOT a held-Step Automation lane')
+
+# Held-Step Automation order, confirmed by the operator on 2026-09-29.
+# NOISE is automatable and sits between LEVEL 3 and CUTOFF 1.
+AUTOMATION_ORDER=('WAVE 1','TUNE 1','WAVE 2','TUNE 2','WAVE 3','TUNE 3',
+ 'LEVEL 1','LEVEL 2','LEVEL 3','NOISE','CUTOFF 1','RESONANCE 1','ENV AM 1',
+ 'CUTOFF 2','RESONANCE 2','ENV AM 2','SPACING','LFO 1','LFO 2',
+ 'DRIVE AMOUNT','MODULATION AMOUNT','DELAY AMOUNT','REVERB AMOUNT')
+# Per-step parameters. Velocity is one of these and is not an automation lane;
+# it sits on the automation panel only because the GUI gave it no other home.
+STEP_PARAMETERS=('GATE','ACC','TIE','VELOCITY','LENGTH')
+# Panel order: the device order, with the step parameter VELOCITY kept available.
+AUTOMATABLE=AUTOMATION_ORDER+('VELOCITY',)
 
 def empty_lines():
     return [{'parameter':name,'values':[None]*64,'units':'device-ui'} for name in AUTOMATABLE]

@@ -5,7 +5,7 @@ from unittest.mock import patch
 import storage,ui_theme
 from data_model import Sequence,Preset
 from native_automation import read_automation,sequence_length,encode_sequence_length
-from automation_metadata import PARAMETERS,AUTOMATABLE,parameter_line
+from automation_metadata import PARAMETERS,AUTOMATABLE,AUTOMATION_ORDER,STEP_PARAMETERS,parameter_line
 from live_creator.core.session import Session,Transport
 from live_creator.core.state import encode,decode
 
@@ -33,11 +33,11 @@ class IntegrationTests(unittest.TestCase):
   from app import App
   from types import SimpleNamespace
   from unittest.mock import Mock
-  seq=Sequence();seq.automation[0]['values'][0]=512
+  seq=Sequence();lane=next(l for l in seq.automation if l['parameter']=='CUTOFF 1');lane['values'][0]=512
   a=SimpleNamespace(preset=Preset(sequence=seq),midi=Mock(),_seq_all_notes_off=Mock())
   App._play_seq_step(a,0);a.midi.send_cc.assert_not_called()
-  seq.automation[0]['cc_values']=[73]*64;App._play_seq_step(a,0);a.midi.send_cc.assert_called_once_with(28,73)
-  seq.length=8;seq.automation[0]['cc_values']=list(range(64));seq.fill64();self.assertEqual(seq.automation[0]['cc_values'][8:16],list(range(8)))
+  lane['cc_values']=[73]*64;App._play_seq_step(a,0);a.midi.send_cc.assert_called_once_with(28,73)
+  seq.length=8;lane['cc_values']=list(range(64));seq.fill64();self.assertEqual(lane['cc_values'][8:16],list(range(8)))
  def test_length_packing(self):
   original=bytes(range(256))*5
   for n in range(1,65):
@@ -67,7 +67,7 @@ class IntegrationTests(unittest.TestCase):
   s.update(20);self.assertLessEqual(s.current_step,10)
   s.toggle(20);s.update(30);self.assertFalse(s.active)
  def test_metadata(self):
-  self.assertEqual(len(AUTOMATABLE),23);self.assertIn('VELOCITY',AUTOMATABLE);self.assertNotIn('FM 1',AUTOMATABLE);self.assertNotIn('KEYTRACKING',AUTOMATABLE)
+  self.assertEqual(len(AUTOMATION_ORDER),23);self.assertIn('VELOCITY',AUTOMATABLE);self.assertNotIn('VELOCITY',AUTOMATION_ORDER);self.assertIn('NOISE',AUTOMATION_ORDER);self.assertNotIn('FM 1',AUTOMATABLE);self.assertNotIn('KEYTRACKING',AUTOMATABLE)
   self.assertEqual(PARAMETERS['SPACING'].scale_labels(),('64','0','-64'))
   self.assertEqual(PARAMETERS['CUTOFF 1'].scale_labels(),('512','256','0'))
   seq=Sequence();self.assertIs(parameter_line(seq,'LEVEL 3'),parameter_line(seq,'LEVEL 3'))

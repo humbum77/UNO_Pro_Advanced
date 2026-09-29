@@ -8,25 +8,29 @@
 
 ```
 python -m compileall -q .                              # PASS
-python -m unittest discover -s tests -p "test_*.py"     # 113 tests
+python -m unittest discover -s tests -p "test_*.py"     # 140 tests
 ```
 
 ## Результат
 
 ```
-Ran 113 tests
-FAILED (failures=3, errors=1, skipped=4)
+Ran 140 tests
+FAILED (failures=4, skipped=4)
 ```
 
 15 тестов добавлены 2026-09-29: `tests/test_matrix_codec.py` проверяет кодек
 на реальных контрольных захватах из `tests/fixtures/UNO_UNIFIED_NORMALIZED_FINAL_2026-09-29.sqlite`.
 Подробности — в `Docs/history/EVIDENCE_BASE.md`.
 
+7 тестов добавлены 2026-09-29: `tests/test_automation_order.py` фиксирует
+подтверждённый порядок автоматизации прибора. Подробности — в
+`Docs/history/PARAMETER_SELECTION_2026-09-29.md`, раздел 7.
+
 Подробно:
 
 | Тест | Тип | Причина |
 |------|-----|---------|
-| `test_integration.test_safety_unchanged` | ERROR | требует `git show 51906bc:…`; `.git` в сборке нет |
+| `test_integration.test_safety_unchanged` | FAIL | закреплён за коммитом `51906bc`, который есть в репозитории, но **не является предком HEAD** — пришёл из слитой линии `main.zip`, где `midi_engine.py` был заглушкой в 57 байт против 3443 сейчас. Причина изменилась: до появления `.git` это был ERROR |
 | `test_integration.test_theme` | FAIL | ожидает прежний Light accent swap; тема в текущем коде одна |
 | `test_v05.test_boundary_segments` | FAIL | **регресс против ТЗ** — см. ниже |
 | `test_v05.test_slots_fit` | FAIL | **регресс против ТЗ** — см. ниже |
@@ -58,6 +62,9 @@ width=1176 → pitch=72.2  total_width=4644  (x шага 64 = 4562)
 | `matrix_codec.py` | переписан на чтение `UNO_MATRIX_FULL_REGISTRY.csv`; FILE id и UI-порядок больше не могут разойтись | 16/16 маршрутов round-trip, проверка реестра ловит битый файл |
 | `app.py:3737` | `slot` инициализируется до `try` — `UnboundLocalError` на битом 0x24 больше не выходит из приёмника | воспроизведение падения до правки |
 | `app.py:3690` | `_drain_midi_rx` обёрнут в `try/finally` — опрос MIDI не может молча остановиться | — |
+| `automation_metadata.py` | `AUTOMATION_ORDER` (23, порядок прибора), `STEP_PARAMETERS`; `NOISE` зарегистрирован как автоматизируемый; `VELOCITY` помечен как параметр шага | `tests/test_automation_order.py`, 7 тестов |
+| `uno_step_automation_decoder.py` | `NOISE` перенесён с позиции 22 на позицию 9, между `LEVEL3` и `CUTOFF1`; порядок вынесен в `DECODER_PARAMETER_ORDER` | `tests/test_automation_order.py` |
+| `tests/test_integration.py` | `test_no_guessed_automation_sends` обращается к полосе по имени `CUTOFF 1`, а не по индексу 0 | тест перестал зависеть от порядка списка |
 
 ## Проверка матрицы модуляции
 
