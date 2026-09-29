@@ -8,13 +8,13 @@
 
 ```
 python -m compileall -q .                              # PASS
-python -m unittest discover -s tests -p "test_*.py"     # 167 tests
+python -m unittest discover -s tests -p "test_*.py"     # 168 tests
 ```
 
 ## Результат
 
 ```
-Ran 167 tests
+Ran 168 tests
 FAILED (failures=4, skipped=4)
 ```
 
@@ -56,6 +56,9 @@ test_menu_only_parameters_are_flagged_uncapturable` — 12 параметров,
 2026-09-29: 54 назначения и 38 источников совпадают по file id, wire id и
 семантике. Подробности — в `Docs/history/MATRIX_OPERATOR_LISTS_2026-09-29.md`.
 
+1 тест добавлен 2026-09-29: `test_editor_source_selector_follows_the_registry`
+запрещает ручному списку `MATRIX_SOURCES` в `app.py` разойтись с реестром.
+
 Подробно:
 
 | Тест | Тип | Причина |
@@ -90,6 +93,7 @@ width=1176 → pitch=72.2  total_width=4644  (x шага 64 = 4562)
 | Файл | Что | Проверка |
 |------|-----|----------|
 | `matrix_codec.py` | переписан на чтение `UNO_MATRIX_FULL_REGISTRY.csv`; FILE id и UI-порядок больше не могут разойтись | 16/16 маршрутов round-trip, проверка реестра ловит битый файл |
+| `UNO_MATRIX_FULL_REGISTRY.csv` | UI-порядок 38 источников приведён к порядку прибора: 17 строк, только столбец `ui_position_0based` | 15/15 тестов кодека без изменений; file id, wire id, семантика и флаги выбора не тронуты |
 | `app.py:3737` | `slot` инициализируется до `try` — `UnboundLocalError` на битом 0x24 больше не выходит из приёмника | воспроизведение падения до правки |
 | `app.py:3690` | `_drain_midi_rx` обёрнут в `try/finally` — опрос MIDI не может молча остановиться | — |
 | `automation_metadata.py` | `AUTOMATION_ORDER` (23, порядок прибора), `STEP_PARAMETERS`; `NOISE` зарегистрирован как автоматизируемый; `VELOCITY` помечен как параметр шага | `tests/test_automation_order.py`, 7 тестов |

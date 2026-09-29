@@ -20,23 +20,23 @@ source,11,17,LFO 1,17,1,11,17,official VST3 numeric enum + controlled WIRE/UI sw
 source,12,18,LFO 1 Fade In,18,1,12,18,official VST3 numeric enum + controlled WIRE/UI sweep + native FILE corpus observed (39 routes),CONFIRMED
 source,13,19,LFO 2,19,1,13,19,official VST3 numeric enum + controlled WIRE/UI sweep + native FILE corpus observed (274 routes),CONFIRMED
 source,14,20,LFO 2 Fade In,20,1,14,20,official VST3 numeric enum + controlled WIRE/UI sweep + native FILE corpus observed (15 routes),CONFIRMED
-source,15,21,Filter Env,25,1,15,21,official VST3 numeric enum + controlled WIRE/UI sweep + native FILE corpus observed (152 routes),CONFIRMED
-source,16,22,Amp Env,30,1,16,22,official VST3 numeric enum + controlled WIRE/UI sweep + native FILE corpus observed (108 routes),CONFIRMED
-source,17,23,CV 1 In,31,1,17,23,official VST3 numeric enum + controlled WIRE/UI sweep + native FILE corpus unobserved,CONFIRMED
-source,18,24,Gate 1 In,32,1,18,24,official VST3 numeric enum + controlled WIRE/UI sweep + native FILE corpus unobserved,CONFIRMED
-source,19,25,CV 2 In,33,1,19,25,official VST3 numeric enum + controlled WIRE/UI sweep + native FILE corpus observed (1 routes),CONFIRMED
-source,1A,26,Gate 2 In,34,1,1A,26,official VST3 numeric enum + controlled WIRE/UI sweep + native FILE corpus unobserved,CONFIRMED
-source,1B,27,Accent,35,1,1B,27,official VST3 numeric enum + controlled WIRE/UI sweep + native FILE corpus observed (4 routes),CONFIRMED
-source,1C,28,Gate,36,1,1C,28,official VST3 numeric enum + controlled WIRE/UI sweep + native FILE corpus observed (1 routes),CONFIRMED
-source,1D,29,Tie,37,1,1D,29,official VST3 numeric enum + controlled WIRE/UI sweep + native FILE corpus unobserved,CONFIRMED
-source,1E,30,Filter Env Attack,21,1,1E,30,official VST3 numeric enum + controlled WIRE/UI sweep + native FILE corpus observed (37 routes),CONFIRMED
-source,1F,31,Filter Env Decay,22,1,1F,31,official VST3 numeric enum + controlled WIRE/UI sweep + native FILE corpus observed (33 routes),CONFIRMED
-source,20,32,Filter Env Sustain,23,1,20,32,official VST3 numeric enum + controlled WIRE/UI sweep + native FILE corpus unobserved,CONFIRMED
-source,21,33,Filter Env Release,24,1,21,33,official VST3 numeric enum + controlled WIRE/UI sweep + native FILE corpus unobserved,CONFIRMED
-source,22,34,Amp Env Attack,26,1,22,34,official VST3 numeric enum + controlled WIRE/UI sweep + native FILE corpus unobserved,CONFIRMED
-source,23,35,Amp Env Decay,27,1,23,35,official VST3 numeric enum + controlled WIRE/UI sweep + native FILE corpus unobserved,CONFIRMED
-source,24,36,Amp Env Sustain,28,1,24,36,official VST3 numeric enum + controlled WIRE/UI sweep + native FILE corpus unobserved,CONFIRMED
-source,25,37,Amp Env Release,29,1,25,37,official VST3 numeric enum + controlled WIRE/UI sweep + native FILE corpus unobserved,CONFIRMED
+source,15,21,Filter Env,21,1,15,21,official VST3 numeric enum + controlled WIRE/UI sweep + native FILE corpus observed (152 routes),CONFIRMED
+source,16,22,Amp Env,22,1,16,22,official VST3 numeric enum + controlled WIRE/UI sweep + native FILE corpus observed (108 routes),CONFIRMED
+source,17,23,CV 1 In,23,1,17,23,official VST3 numeric enum + controlled WIRE/UI sweep + native FILE corpus unobserved,CONFIRMED
+source,18,24,Gate 1 In,24,1,18,24,official VST3 numeric enum + controlled WIRE/UI sweep + native FILE corpus unobserved,CONFIRMED
+source,19,25,CV 2 In,25,1,19,25,official VST3 numeric enum + controlled WIRE/UI sweep + native FILE corpus observed (1 routes),CONFIRMED
+source,1A,26,Gate 2 In,26,1,1A,26,official VST3 numeric enum + controlled WIRE/UI sweep + native FILE corpus unobserved,CONFIRMED
+source,1B,27,Accent,27,1,1B,27,official VST3 numeric enum + controlled WIRE/UI sweep + native FILE corpus observed (4 routes),CONFIRMED
+source,1C,28,Gate,28,1,1C,28,official VST3 numeric enum + controlled WIRE/UI sweep + native FILE corpus observed (1 routes),CONFIRMED
+source,1D,29,Tie,29,1,1D,29,official VST3 numeric enum + controlled WIRE/UI sweep + native FILE corpus unobserved,CONFIRMED
+source,1E,30,Filter Env Attack,30,1,1E,30,official VST3 numeric enum + controlled WIRE/UI sweep + native FILE corpus observed (37 routes),CONFIRMED
+source,1F,31,Filter Env Decay,31,1,1F,31,official VST3 numeric enum + controlled WIRE/UI sweep + native FILE corpus observed (33 routes),CONFIRMED
+source,20,32,Filter Env Sustain,32,1,20,32,official VST3 numeric enum + controlled WIRE/UI sweep + native FILE corpus unobserved,CONFIRMED
+source,21,33,Filter Env Release,33,1,21,33,official VST3 numeric enum + controlled WIRE/UI sweep + native FILE corpus unobserved,CONFIRMED
+source,22,34,Amp Env Attack,34,1,22,34,official VST3 numeric enum + controlled WIRE/UI sweep + native FILE corpus unobserved,CONFIRMED
+source,23,35,Amp Env Decay,35,1,23,35,official VST3 numeric enum + controlled WIRE/UI sweep + native FILE corpus unobserved,CONFIRMED
+source,24,36,Amp Env Sustain,36,1,24,36,official VST3 numeric enum + controlled WIRE/UI sweep + native FILE corpus unobserved,CONFIRMED
+source,25,37,Amp Env Release,37,1,25,37,official VST3 numeric enum + controlled WIRE/UI sweep + native FILE corpus unobserved,CONFIRMED
 destination,00,0,OFF,0,1,00,0,official VST3 numeric enum + controlled WIRE/UI sweep + native FILE corpus observed (6598 routes),CONFIRMED
 destination,01,1,Pitch,,0,01,1,official VST3 numeric enum + controlled WIRE/UI sweep + native FILE corpus observed (231 routes),CONFIRMED_HIDDEN
 destination,02,2,Volume,1,1,02,2,official VST3 numeric enum + controlled WIRE/UI sweep + native FILE corpus observed (150 routes),CONFIRMED

@@ -130,9 +130,24 @@ class OperatorMatrixLists(unittest.TestCase):
                          ["Pitch", "LFO 1 Retrigger", "LFO 2 Retrigger",
                           "Gate Out 1", "Gate Out 2"])
 
-    def test_source_ui_positions_form_a_complete_permutation(self):
+    def test_source_ui_order_is_the_device_order(self):
+        # The operator asked for the source selector to follow the device. The
+        # registry previously carried a different permutation, so the UI order is
+        # now required to equal the FILE id for every source.
+        for item in matrix_codec.SOURCES:
+            self.assertEqual(item.ui_index, item.file_id, item.name)
         seen = sorted(x.ui_index for x in matrix_codec.SOURCES)
         self.assertEqual(seen, list(range(38)))
+
+    def test_editor_source_selector_follows_the_registry(self):
+        # app.py keeps its own list for the dropdown. It must not drift from the
+        # registry, which is the single source of truth for UI order.
+        from app import MATRIX_SOURCES
+        self.assertEqual(len(MATRIX_SOURCES), 38)
+        for item, label in zip(matrix_codec.SOURCES, MATRIX_SOURCES):
+            self.assertEqual(key(item.name), key(label),
+                             f"source 0x{item.file_id:02X}: "
+                             f"registry {item.name!r} vs dropdown {label!r}")
 
 
 if __name__ == "__main__":
