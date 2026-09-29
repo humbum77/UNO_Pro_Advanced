@@ -62,6 +62,11 @@ class Sequence:
 @dataclass
 class Preset:
     name:str='INIT'; number:Optional[int]=None; params:Dict[str,int]=field(default_factory=dict); sequence:Sequence=field(default_factory=Sequence); tags:List[str]=field(default_factory=list); category:str='My Presets'; source:str='local'
+    # Native modulation-matrix routes, one dict per slot, as decoded from or
+    # intended for the .unosyp state head.  Kept beside the model because the
+    # matrix lives in the same native bytes as the sequencer fields, not in the
+    # editor JSON parameter set.
+    matrix:List[Dict]=field(default_factory=list)
     def save(self,path):
         with open(path,'w',encoding='utf-8') as f: json.dump(asdict(self),f,ensure_ascii=False,indent=2)
 @dataclass

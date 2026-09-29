@@ -31,6 +31,12 @@ AMOUNT_MIN = -63
 AMOUNT_MAX = 64
 FADE_MAX = 255
 
+# Routes 5, 6 and 7 occupy the same bits as the sequencer fields that live at
+# file bytes 207-212: sequence length (207-208), shared Gate (209-210) and
+# shared Accent (212).  Their decoded "route" values are therefore not
+# independent of the sequencer and must not be written on their own.
+SEQUENCER_OVERLAP_SLOTS = (5, 6, 7)
+
 
 @dataclass(frozen=True)
 class MatrixParameter:
@@ -191,13 +197,23 @@ def decode_matrix(raw):
     return routes
 
 
-def encode_matrix(raw, changes):
-    """Return raw state bytes with only the named fields of the named slots changed."""
+def encode_matrix(raw, changes, allow_overlapping=True):
+    """Return raw state bytes with only the named fields of the named slots changed.
+
+    ``allow_overlapping=False`` refuses the three routes whose cells share bits
+    with the sequencer fields (see :data:`SEQUENCER_OVERLAP_SLOTS`).  Those
+    routes cannot be written independently: writing them would corrupt the
+    sequence length, shared Gate and shared Accent that live in the same bytes.
+    """
     out = bytearray(raw)
     for slot, change in changes.items():
         slot = int(slot)
         if not 0 <= slot < ROUTE_COUNT:
             raise ValueError('Matrix slot must be 0..15')
+        if slot + 1 in SEQUENCER_OVERLAP_SLOTS and not allow_overlapping:
+            raise ValueError(
+                f'route {slot + 1} shares bits with the sequencer length/Gate/Accent '
+                f'fields and cannot be written independently')
         base = MATRIX_BIT + slot * ROUTE_BITS
         if 'source_file_id' in change:
             value = int(change['source_file_id'])
@@ -224,6 +240,20 @@ def encode_matrix(raw, changes):
     return bytes(out)
 
 
+def write_matrix_to_file(file_bytes, changes, allow_overlapping=True):
+    """Apply matrix changes to whole ``.unosyp`` bytes and keep the tail intact.
+
+    Everything after the 297-byte state head -- the sequence pages -- is
+    preserved byte for byte.
+    """
+    original = bytes(file_bytes)
+    if len(original) < FILE_STATE_SIZE:
+        raise ValueError('native .unosyp is too short to contain a preset state')
+    raw = decode_file_state(original)
+    updated = encode_matrix(raw, changes, allow_overlapping=allow_overlapping)
+    return encode_file_state(updated) + original[FILE_STATE_SIZE:]
+
+
 def ui_route_to_file_change(source, destination, amount, fade, source_names=None, destination_names=None):
     """Translate one editor route into FILE fields.
 
@@ -231,6 +261,7 @@ def ui_route_to_file_change(source, destination, amount, fade, source_names=None
     for identifiers that the selector does not expose.  UI positions are never
     accepted as FILE ids.
     """
+def ui_route_to_file_change(source, destination, amount, fade, source_names=None, destination_names=None):
     change = {}
 
     def resolve(value, by_name, prefix):
@@ -264,6 +295,13 @@ def ui_route_to_file_change(source, destination, amount, fade, source_names=None
 def decode_destination_file_id(file_id):
     file_id = int(file_id) & 0x3F
     item = DEST_BY_FILE.get(file_id)
+    return item.name if item is not None else f'FILE 0x{file_id:02X}'
+
+
+def decode_source_file_id(file_id):
+    """Return the source name for a native FILE id, or the raw form if unknown."""
+    file_id = int(file_id) & 0x3F
+    item = SOURCE_BY_FILE.get(file_id)
     return item.name if item is not None else f'FILE 0x{file_id:02X}'
 
 

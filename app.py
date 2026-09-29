@@ -21,7 +21,8 @@ from hardware_seq_0x29 import parse_0x29_response,apply_to_sequence
 from ui_layout import Viewport,split_columns,synth_columns,three_columns
 from live_creator.devices.uno.catalog_cache import load_cache as load_hardware_cache,save_cache as save_hardware_cache,utc_now as catalog_utc_now
 from live_creator.devices.uno.hardware_bank import CACHE_DIR as HARDWARE_PRESET_CACHE,load_bank as load_hardware_bank,local_entry as hardware_local_entry,physical_entry as hardware_physical_entry,reset_from_catalog as reset_hardware_bank,save_bank as save_hardware_bank
-from matrix_codec import MATRIX_DESTINATION_FILE_NAMES, decode_destination_file_id
+from matrix_codec import MATRIX_DESTINATION_FILE_NAMES, decode_destination_file_id, decode_source_file_id, DEST_BY_FILE as MATRIX_DESTINATION_IDS, AMOUNT_MIN as MATRIX_AMOUNT_MIN, AMOUNT_MAX as MATRIX_AMOUNT_MAX
+MATRIX_AMOUNT_RANGE=(MATRIX_AMOUNT_MIN,MATRIX_AMOUNT_MAX)
 
 MATRIX_SOURCES=['Velocity','Mod Wheel','Aftertouch','Key Pitch','Key Gate','Osc 1 Tune','Osc 1 Level','Osc 2 Tune','Osc 2 Level','Osc 3 Tune','Osc 3 Level','Noise','Filter 1 Cutoff','Filter 1 Res','Filter 2 Cutoff','Filter 2 Res','Filter Spacing','LFO 1','LFO 1 Fade In','LFO 2','LFO 2 Fade In','Filter Env','Amp Env','CV 1 IN','GATE 1 IN','CV 2 IN','GATE 2 IN','Accent','Gate','Tie','Filter Env Attack','Filter Env Decay','Filter Env Sustain','Filter Env Release','Amp Env Attack','Amp Env Decay','Amp Env Sustain','Amp Env Release']
 MATRIX_DESTINATIONS=list(MATRIX_DESTINATION_FILE_NAMES)
@@ -887,7 +888,7 @@ class App(tk.Tk):
   if key in ('OSC1_TUNE','OSC2_TUNE','OSC3_TUNE'):return (-24,24)
   if key in ('FILTER_SPACING','F1_ENV','F2_ENV'):return (-63,64)
   if key in ('F1_TRACK','F2_TRACK'):return (-200,200)
-  if key.startswith('MAMT'):return (-64,64)
+  if key.startswith('MAMT'):return MATRIX_AMOUNT_RANGE
   return (0,127)
  def _send_local_preview(self):
   # Temporary current-buffer preview only. No Program Change and no permanent STORE/bulk write.
@@ -964,6 +965,7 @@ class App(tk.Tk):
      for cc,decoded in state.get('resolved',{}).items():
       if self._apply_state_cc(cc,decoded):applied+=1
      self._apply_extended_preset_fields(state.get('extended',{}))
+     self.preset.matrix=list(state.get('extended',{}).get('matrix',[]))
     active=sum(1 for st in self.preset.sequence.steps if st.notes)
     self.status=(f'LOCAL PRESET: {applied} synth fields / {active} active sequence steps' if seq is not None else f'LOCAL PRESET: {applied} synth fields / sequence not decoded for this file variant')
     if preview:
@@ -1155,11 +1157,26 @@ class App(tk.Tk):
   tk.Label(win,text=str(message),bg=BG,fg=TEXT,justify='left',wraplength=450,font=('Segoe UI',10)).place(x=24,y=22,width=452,height=86)
   def done(v):result['ok']=bool(v);win.destroy()
   tk.Button(win,text='CANCEL',command=lambda:done(False),bg=PANEL2,fg=TEXT,activebackground='#273137',activeforeground=TEXT,relief='flat').place(x=300,y=124,width=84,height=32);tk.Button(win,text='OK',command=lambda:done(True),bg=ORANGE2,fg=TEXT,activebackground=ORANGE,activeforeground=BG,relief='flat').place(x=392,y=124,width=84,height=32);win.bind('<Escape>',lambda e:done(False));self.wait_window(win);return result['ok']
+ def _collect_matrix(self):
+  # Read the 16 Matrix routes out of the GUI state as native FILE ids.
+  # The GUI holds names; the preset must hold FILE ids, so the registry does
+  # the translation. A route whose name is unknown keeps its raw id.
+  from matrix_codec import SOURCE_BY_NAME, DEST_BY_NAME
+  routes=[]
+  for i in range(16):
+   src_name=self.values.get(f'MSRC{i}');dst_name=self.values.get(f'MDST{i}')
+   src=SOURCE_BY_NAME.get(src_name);dst=DEST_BY_NAME.get(dst_name)
+   source_id=src.file_id if src else (int(src_name[7:],16) if isinstance(src_name,str) and src_name.startswith('FILE 0x') else 0)
+   dest_id=dst.file_id if dst else (int(dst_name[7:],16) if isinstance(dst_name,str) and dst_name.startswith('FILE 0x') else 0)
+   routes.append({'source_file_id':int(source_id),'destination_file_id':int(dest_id),
+                  'amount':int(self.values.get(f'MAMT{i}',0)),
+                  'fade':int(self.values.get(f'MFADE{i}',0))})
+  return routes
  def save_local_preset(self):
   # Local SAVE always targets the default UNO Synth Pro preset folder.
   name=self._ask_text('Save preset','Preset name:',self.preset.name if self.preset.name not in ('INIT','RANDOM') else '')
   if not name:return
-  p=copy.deepcopy(self.preset);p.name=name;p.params=self._collect_params()
+  p=copy.deepcopy(self.preset);p.name=name;p.params=self._collect_params();p.matrix=self._collect_matrix()
   try:
    saved=storage.save_preset(p);self.preset.name=name;self.lib_selected=saved;self.status=f'SAVED LOCAL: {saved.name}';self.redraw()
   except Exception as e:self._notify('Save preset',str(e),True)
@@ -1169,7 +1186,7 @@ class App(tk.Tk):
   if not path:return False
   path=Path(path)
   if path.exists() and not self._confirm('Overwrite file',f'Overwrite {path.name}?'):return False
-  p=copy.deepcopy(self.preset);p.name=path.stem;p.params=self._collect_params()
+  p=copy.deepcopy(self.preset);p.name=path.stem;p.params=self._collect_params();p.matrix=self._collect_matrix()
   try:storage.save_working_preset(p,path)
   except Exception as e:self._notify('Save preset',str(e),True);return False
   self.status=f'SAVED AS: {path.name}';self.redraw();return True
@@ -1724,7 +1741,7 @@ class App(tk.Tk):
   self.rect(matrix_x,my,matrix_w,mh);self.text(mx(14),my+10,'MOD MATRIX — 16 ROUTES',14,bold=True);self.text(mx(80),my+38,'SOURCE',9,MUTED);self.text(mx(410),my+38,'AMOUNT',9,MUTED);self.text(mx(640),my+38,'DESTINATION',9,MUTED);self.text(mx(1020),my+38,'FADE IN',9,MUTED)
   rowh=30;ctrlh=22;startrow=max(0,min(12,self.matrix_scroll))
   for vis,i in enumerate(range(startrow,startrow+4)):
-   yy=my+56+vis*rowh;self.text(mx(17),yy+ctrlh/2,f'{i+1:02}',8,MUTED,'w');self.dropdown(mx(60),yy,mw(250),ctrlh,self.values.get(f'MSRC{i}','SOURCE'),f'MSRC{i}',MATRIX_SOURCES);src=self.values.get(f'MSRC{i}','SOURCE');bi=self._matrix_source_bipolar(src);self.slider(mx(340),yy+ctrlh/2-4,mw(220),'',f'MAMT{i}',-64 if bi else 0,64,bi,show_label=False);self.dropdown(mx(590),yy,mw(315),ctrlh,self.values.get(f'MDST{i}','DESTINATION'),f'MDST{i}',MATRIX_DESTINATIONS);self.slider(mx(935),yy+ctrlh/2-4,mw(260),'',f'MFADE{i}',0,255,False,show_label=False)
+   yy=my+56+vis*rowh;self.text(mx(17),yy+ctrlh/2,f'{i+1:02}',8,MUTED,'w');self.dropdown(mx(60),yy,mw(250),ctrlh,self.values.get(f'MSRC{i}','SOURCE'),f'MSRC{i}',MATRIX_SOURCES);src=self.values.get(f'MSRC{i}','SOURCE');bi=self._matrix_source_bipolar(src);self.slider(mx(340),yy+ctrlh/2-4,mw(220),'',f'MAMT{i}',MATRIX_AMOUNT_MIN if bi else 0,MATRIX_AMOUNT_MAX,bi,show_label=False);self.dropdown(mx(590),yy,mw(315),ctrlh,self.values.get(f'MDST{i}','DESTINATION'),f'MDST{i}',MATRIX_DESTINATIONS);self.slider(mx(935),yy+ctrlh/2-4,mw(260),'',f'MFADE{i}',0,255,False,show_label=False)
   track_y=my+56;track_h=rowh*4;track_x=matrix_x+matrix_w-20;self.line(track_x,track_y,track_x,track_y+track_h,EDGE,3);thumb_h=track_h*4/16;thumb_y=track_y+(track_h-thumb_h)*(startrow/12 if 12 else 0);self.line(track_x,thumb_y,track_x,thumb_y+thumb_h,ORANGE,4)
 
  def _matrix_source_bipolar(self,source):
@@ -2794,7 +2811,7 @@ class App(tk.Tk):
   if key in ('F1_TRACK','F2_TRACK'):
    return round(-200+raw*200/63) if raw<=63 else round((raw-63)*200/64)
   if key in ('OSC1_TUNE','OSC2_TUNE','OSC3_TUNE'):return round(denorm(raw,-24,24))
-  if key.startswith('MAMT'):return round(denorm(raw,-64,64))
+  if key.startswith('MAMT'):return round(denorm(raw,*MATRIX_AMOUNT_RANGE))
   return raw
  def _send_cc_ui(self,key,value):
   # Coalesce only high-frequency mouse drags. Clicks, wheel moves and numeric entry stay immediate.
@@ -2834,9 +2851,14 @@ class App(tk.Tk):
    mask=int(ext['arp_pattern']);self.arp_trig=[bool(mask&(1<<i)) for i in range(16)]
   for i,route in enumerate(ext.get('matrix',[])[:16]):
    src=route.get('source');dst=route.get('destination')
-   if src is not None and 0<=int(src)<len(MATRIX_SOURCES):self.values[f'MSRC{i}']=MATRIX_SOURCES[int(src)]
+   # A native FILE id is looked up in the registry, never used as a UI index:
+   # the visible selector is shorter than the native enum, so ids 0x32..0x35
+   # (Mod 13..16) fall outside it and used to render as a bare "FILE 0x32".
+   if src is not None:self.values[f'MSRC{i}']=decode_source_file_id(src)
    if dst is not None:
-    di=int(dst);self.values[f'MDST{i}']=MATRIX_DESTINATIONS[di] if 0<=di<len(MATRIX_DESTINATIONS) else f'FILE 0x{di:02X}'
+    di=int(dst);self.values[f'MDST{i}']=decode_destination_file_id(di)
+    if di not in MATRIX_DESTINATION_IDS and f'FILE 0x{di:02X}'==self.values[f'MDST{i}']:
+     self.status=f'Matrix route {i+1}: destination FILE 0x{di:02X} is not in the registry'
    if route.get('amount') is not None:self.values[f'MAMT{i}']=int(route['amount'])
    if route.get('fade') is not None:self.values[f'MFADE{i}']=int(route['fade'])
 

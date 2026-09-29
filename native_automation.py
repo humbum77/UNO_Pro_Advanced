@@ -103,12 +103,93 @@ def encode_sequence_gate_accent(data, gate_value, accent_value):
     result=bytearray(data);result[209]=gate_raw&127;result[210]=(gate_raw>>7)&127;result[212]=accent
     return bytes(result)
 
-def write_sequence_automation(sequence):
-    """Build a native preset by editing resolved targets in its source bytes."""
+def _same_route(before, change):
+    if not isinstance(before, dict):
+        return False
+    if 'source_file_id' in change and int(before.get('source', -1)) != change['source_file_id']:
+        return False
+    if 'destination_file_id' in change and int(before.get('destination', -1)) != change['destination_file_id']:
+        return False
+    if 'amount' in change and before.get('amount') != change['amount']:
+        return False
+    if 'fade' in change and before.get('fade') != change['fade']:
+        return False
+    return True
+
+
+def matrix_routes_to_changes(matrix, original=None):
+    """Translate the editor's per-route state into native FILE changes.
+
+    Each entry is ``{source, destination, amount, fade}`` where source and
+    destination are native FILE ids.  ``None`` and empty entries mean the route
+    is unused and are left untouched rather than cleared: the codec only changes
+    fields it is explicitly given.
+
+    When ``original`` (the same shape, as decoded from the file being written) is
+    supplied, only routes that actually differ are returned.  That is what keeps
+    the three sequencer-overlapping routes out of the write: they are unchanged
+    whenever the user did not touch them.
+    """
+    changes = {}
+    for slot, route in enumerate(matrix or []):
+        if not isinstance(route, dict):
+            continue
+        change = {}
+        source = route.get('source_file_id', route.get('source'))
+        destination = route.get('destination_file_id', route.get('destination'))
+        if source is not None and int(source) != 0:
+            change['source_file_id'] = int(source)
+        if destination is not None and int(destination) != 0:
+            change['destination_file_id'] = int(destination)
+        if route.get('amount') is not None:
+            change['amount'] = int(route['amount'])
+        if route.get('fade') is not None:
+            change['fade'] = int(route['fade'])
+        if not change:
+            continue
+        if original is not None and _same_route(original[slot] if slot < len(original) else None, change):
+            continue
+        changes[slot] = change
+    return changes
+
+
+def apply_matrix_to_file(file_bytes, matrix):
+    """Write the editor matrix into native .unosyp bytes, keeping everything else.
+
+    Only routes that differ from the file's own decoded state are written, so
+    untouched routes -- including the three that share bits with the sequencer
+    -- keep their original bytes.
+    """
+    from matrix_codec import (write_matrix_to_file, decode_file_state, decode_matrix,
+                              SEQUENCER_OVERLAP_SLOTS)
+    original = decode_matrix(decode_file_state(file_bytes))
+    original_routes = [{'source': r['source_file_id'], 'destination': r['destination_file_id'],
+                        'amount': r['amount'], 'fade': r['fade']} for r in original]
+    changes = matrix_routes_to_changes(matrix, original_routes)
+    if not changes:
+        return bytes(file_bytes)
+    blocked = sorted(slot + 1 for slot in changes if slot + 1 in SEQUENCER_OVERLAP_SLOTS)
+    if blocked:
+        raise ValueError(
+            f'Matrix routes {blocked} share bits with the sequencer length / Gate / Accent '
+            f'fields and cannot be written yet')
+    return write_matrix_to_file(file_bytes, changes, allow_overlapping=False)
+
+
+def write_sequence_automation(sequence, matrix=None):
+    """Build a native preset by editing resolved targets in its source bytes.
+
+    ``matrix`` is the editor's modulation-matrix state.  It is applied to the
+    state head first, then the sequencer fields are written last, because the
+    matrix routes 5-7 share bits with the sequence length and the shared
+    Gate/Accent values: the sequencer fields must win.
+    """
     from uno_step_automation_decoder import write_resolved_values
     if not getattr(sequence, 'native_raw_hex', ''):
         raise ValueError('Native Save requires a preset loaded from a binary .unosyp file')
     raw = bytes.fromhex(sequence.native_raw_hex)
+    if matrix is not None:
+        raw = apply_matrix_to_file(raw, matrix)
     native = getattr(sequence, 'native_automation', {}) or {}
     entries = native.get('entries', [])
     resolved = {(int(item.get('step') or 0), item.get('parameter')) for item in entries

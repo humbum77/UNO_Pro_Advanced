@@ -127,12 +127,20 @@ def load_binary_unosyp_sequence(path):
     seq.gate_value=max(0,min(10,int(info.get('gate_value',7) or 0)));seq.accent_value=max(0,min(127,int(info.get('accent_value',64) or 0)))
     seq.native_raw_hex=raw.hex()
     try:
-        decoded=read_automation(raw)
-        if decoded.get('profile'):
-            from uno_step_automation_decoder import decode
-            apply_decoded_to_sequence(seq,decode(raw))
-        else:
-            seq.native_automation=decoded
+        # The container view and the resolved view are both required. Gating the
+        # canonical decoder on a recognised profile used to discard it for every
+        # ordinary factory preset, leaving an empty automation panel with no
+        # indication of why. Run it always; a missing profile only means the
+        # target names stay unresolved, which the status must say out loud.
+        container=read_automation(raw)
+        from uno_step_automation_decoder import decode
+        native=decode(raw)
+        resolved=apply_decoded_to_sequence(seq,native)
+        resolved['container_entry_count']=container.get('entry_count')
+        resolved['container_payload_hex']=container.get('payload_hex')
+        resolved['lanes_populated']=sum(1 for lane in seq.automation
+                                         for value in lane.get('values',[]) if value is not None)
+        seq.native_automation=resolved
     except ValueError as exc:seq.native_automation={'status':'UNKNOWN','warning':str(exc)}
     seq.binary_page_headers=[p.get('header_hex','') for p in info.get('pages',[])]
     seq.binary_page_metadata=[p.get('metadata_hex','') for p in info.get('pages',[])]
@@ -252,7 +260,7 @@ def save_working_preset(preset,path):
             raise ValueError('Refusing to replace a native preset with JSON or JSON with native data.')
     if native:
         from native_automation import write_sequence_automation
-        payload=write_sequence_automation(preset.sequence)
+        payload=write_sequence_automation(preset.sequence,getattr(preset,'matrix',None) or None)
     else:
         payload=json.dumps(asdict(preset),ensure_ascii=False,indent=2).encode('utf-8')
     fd,tmp=tempfile.mkstemp(prefix=path.name+'.',suffix='.tmp',dir=str(path.parent))
