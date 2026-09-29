@@ -8,13 +8,13 @@
 
 ```
 python -m compileall -q .                              # PASS
-python -m unittest discover -s tests -p "test_*.py"     # 158 tests
+python -m unittest discover -s tests -p "test_*.py"     # 167 tests
 ```
 
 ## Результат
 
 ```
-Ran 158 tests
+Ran 167 tests
 FAILED (failures=4, skipped=4)
 ```
 
@@ -50,6 +50,11 @@ test_menu_only_parameters_are_flagged_uncapturable` — 12 параметров,
 `1st1c`..`1st99c`, чтение `пара/16 = центы` по смещению `0x01F1` на контрольных
 съёмках `99C`/`1ST`/`2ST` и наличие значения 146c (`1st46c`) в `DHK_Y.unosyp`.
 Последние два пропускаются, если съёмок рядом нет.
+
+9 тестов добавлены 2026-09-29: `tests/test_matrix_operator_lists.py` сверяют
+реестр матрицы со списками назначений и источников, переданными оператором
+2026-09-29: 54 назначения и 38 источников совпадают по file id, wire id и
+семантике. Подробности — в `Docs/history/MATRIX_OPERATOR_LISTS_2026-09-29.md`.
 
 Подробно:
 
