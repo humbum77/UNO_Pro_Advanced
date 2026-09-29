@@ -140,14 +140,35 @@ class OperatorMatrixLists(unittest.TestCase):
         self.assertEqual(seen, list(range(38)))
 
     def test_editor_source_selector_follows_the_registry(self):
-        # app.py keeps its own list for the dropdown. It must not drift from the
-        # registry, which is the single source of truth for UI order.
+        # app.py takes its dropdown from the codec, so there is one copy only.
         from app import MATRIX_SOURCES
+        self.assertEqual(list(MATRIX_SOURCES),
+                         list(matrix_codec.MATRIX_SOURCE_FILE_NAMES))
         self.assertEqual(len(MATRIX_SOURCES), 38)
-        for item, label in zip(matrix_codec.SOURCES, MATRIX_SOURCES):
-            self.assertEqual(key(item.name), key(label),
+        for item, label in zip(sorted(matrix_codec.SOURCES,
+                                      key=lambda x: x.ui_index), MATRIX_SOURCES):
+            self.assertEqual(item.name, label,
                              f"source 0x{item.file_id:02X}: "
                              f"registry {item.name!r} vs dropdown {label!r}")
+
+    def test_every_selector_label_resolves_to_a_file_id(self):
+        # This is the guard that catches a label the codec cannot look up. Four
+        # sources used to fail here because the registry and the dropdown spelled
+        # CV/Gate IN differently, which made those routes unwritable.
+        for label in matrix_codec.MATRIX_SOURCE_FILE_NAMES:
+            change = matrix_codec.ui_route_to_file_change(label, 'Osc 1 Level', 32, 0)
+            self.assertIn('source_file_id', change, label)
+        for label in matrix_codec.MATRIX_DESTINATION_FILE_NAMES:
+            change = matrix_codec.ui_route_to_file_change('Velocity', label, 32, 0)
+            self.assertIn('destination_file_id', change, label)
+
+    def test_the_cv_and_gate_in_sources_are_writable(self):
+        for file_id, label in ((0x17, "CV 1 IN"), (0x18, "GATE 1 IN"),
+                               (0x19, "CV 2 IN"), (0x1A, "GATE 2 IN")):
+            self.assertIn(label, matrix_codec.MATRIX_SOURCE_FILE_NAMES)
+            change = matrix_codec.ui_route_to_file_change(label, 'Osc 1 Level', 32, 0)
+            self.assertEqual(change['source_file_id'], file_id, label)
+            self.assertEqual(matrix_codec.decode_source_file_id(file_id), label)
 
 
 if __name__ == "__main__":

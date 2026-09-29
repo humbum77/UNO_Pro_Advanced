@@ -157,10 +157,10 @@ class MatrixCodecEvidenceTests(unittest.TestCase):
             'Tie': 'Tie',
             'FilterEnv': 'Filter Env',
             'Amp Env': 'Amp Env',
-            'CV 1 IN': 'CV 1 In',
-            'CV 2 IN': 'CV 2 In',
-            'GATE 1 IN': 'Gate 1 In',
-            'GATE 2 IN': 'Gate 2 In',
+            'CV 1 IN': 'CV 1 IN',
+            'CV 2 IN': 'CV 2 IN',
+            'GATE 1 IN': 'GATE 1 IN',
+            'GATE 2 IN': 'GATE 2 IN',
             'FiltEnvAtt': 'Filter Env Attack',
             'FiltEnvDec': 'Filter Env Decay',
             'FiltEnvSus': 'Filter Env Sustain',
@@ -180,7 +180,7 @@ class MatrixCodecEvidenceTests(unittest.TestCase):
                                  mc.SOURCE_BY_NAME[expected_source[key]].file_id)
 
     def test_user_supplied_replacements_decode(self):
-        expected = {'AmpEnvSus': 'Amp Env Sustain', 'GATE 2 IN': 'Gate 2 In'}
+        expected = {'AmpEnvSus': 'Amp Env Sustain', 'GATE 2 IN': 'GATE 2 IN'}
         for key, (blob, replacement) in sorted(self.presets.items()):
             if key not in expected:
                 continue

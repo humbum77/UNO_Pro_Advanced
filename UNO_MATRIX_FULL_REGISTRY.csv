@@ -22,10 +22,10 @@ source,13,19,LFO 2,19,1,13,19,official VST3 numeric enum + controlled WIRE/UI sw
 source,14,20,LFO 2 Fade In,20,1,14,20,official VST3 numeric enum + controlled WIRE/UI sweep + native FILE corpus observed (15 routes),CONFIRMED
 source,15,21,Filter Env,21,1,15,21,official VST3 numeric enum + controlled WIRE/UI sweep + native FILE corpus observed (152 routes),CONFIRMED
 source,16,22,Amp Env,22,1,16,22,official VST3 numeric enum + controlled WIRE/UI sweep + native FILE corpus observed (108 routes),CONFIRMED
-source,17,23,CV 1 In,23,1,17,23,official VST3 numeric enum + controlled WIRE/UI sweep + native FILE corpus unobserved,CONFIRMED
-source,18,24,Gate 1 In,24,1,18,24,official VST3 numeric enum + controlled WIRE/UI sweep + native FILE corpus unobserved,CONFIRMED
-source,19,25,CV 2 In,25,1,19,25,official VST3 numeric enum + controlled WIRE/UI sweep + native FILE corpus observed (1 routes),CONFIRMED
-source,1A,26,Gate 2 In,26,1,1A,26,official VST3 numeric enum + controlled WIRE/UI sweep + native FILE corpus unobserved,CONFIRMED
+source,17,23,CV 1 IN,23,1,17,23,official VST3 numeric enum + controlled WIRE/UI sweep + native FILE corpus unobserved,CONFIRMED
+source,18,24,GATE 1 IN,24,1,18,24,official VST3 numeric enum + controlled WIRE/UI sweep + native FILE corpus unobserved,CONFIRMED
+source,19,25,CV 2 IN,25,1,19,25,official VST3 numeric enum + controlled WIRE/UI sweep + native FILE corpus observed (1 routes),CONFIRMED
+source,1A,26,GATE 2 IN,26,1,1A,26,official VST3 numeric enum + controlled WIRE/UI sweep + native FILE corpus unobserved,CONFIRMED
 source,1B,27,Accent,27,1,1B,27,official VST3 numeric enum + controlled WIRE/UI sweep + native FILE corpus observed (4 routes),CONFIRMED
 source,1C,28,Gate,28,1,1C,28,official VST3 numeric enum + controlled WIRE/UI sweep + native FILE corpus observed (1 routes),CONFIRMED
 source,1D,29,Tie,29,1,1D,29,official VST3 numeric enum + controlled WIRE/UI sweep + native FILE corpus unobserved,CONFIRMED

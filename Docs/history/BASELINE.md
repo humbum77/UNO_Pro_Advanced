@@ -8,13 +8,13 @@
 
 ```
 python -m compileall -q .                              # PASS
-python -m unittest discover -s tests -p "test_*.py"     # 168 tests
+python -m unittest discover -s tests -p "test_*.py"     # 170 tests
 ```
 
 ## Результат
 
 ```
-Ran 168 tests
+Ran 170 tests
 FAILED (failures=4, skipped=4)
 ```
 
@@ -56,8 +56,10 @@ test_menu_only_parameters_are_flagged_uncapturable` — 12 параметров,
 2026-09-29: 54 назначения и 38 источников совпадают по file id, wire id и
 семантике. Подробности — в `Docs/history/MATRIX_OPERATOR_LISTS_2026-09-29.md`.
 
-1 тест добавлен 2026-09-29: `test_editor_source_selector_follows_the_registry`
-запрещает ручному списку `MATRIX_SOURCES` в `app.py` разойтись с реестром.
+3 теста добавлены 2026-09-29 в тот же файл: UI-порядок источников равен
+порядку прибора, выпадающий список `app.py` берётся из кодека, и **каждая
+подпись селектора резолвится в FILE id** — последний и есть проверка, которая
+поймала неписавшиеся четыре источника.
 
 Подробно:
 
@@ -94,6 +96,10 @@ width=1176 → pitch=72.2  total_width=4644  (x шага 64 = 4562)
 |------|-----|----------|
 | `matrix_codec.py` | переписан на чтение `UNO_MATRIX_FULL_REGISTRY.csv`; FILE id и UI-порядок больше не могут разойтись | 16/16 маршрутов round-trip, проверка реестра ловит битый файл |
 | `UNO_MATRIX_FULL_REGISTRY.csv` | UI-порядок 38 источников приведён к порядку прибора: 17 строк, только столбец `ui_position_0based` | 15/15 тестов кодека без изменений; file id, wire id, семантика и флаги выбора не тронуты |
+| `UNO_MATRIX_FULL_REGISTRY.csv` | названия `CV 1 IN`, `GATE 1 IN`, `CV 2 IN`, `GATE 2 IN` приведены к написанию прибора; **было: четыре источника не писались** — `ValueError: unknown Matrix entry` | все 38 источников и 54 назначения резолвятся; `test_the_cv_and_gate_in_sources_are_writable` |
+| `app.py:27` | ручной список `MATRIX_SOURCES` удалён, список берётся из `matrix_codec.MATRIX_SOURCE_FILE_NAMES` | `test_editor_source_selector_follows_the_registry` |
+| `matrix_codec.py:104` | `MATRIX_SOURCE_FILE_NAMES` упорядочен по `ui_index` явно | — |
+| `tests/test_matrix_codec.py` | фикстуры `expected_source` приведены к новому написанию | 15/15 проходят |
 | `app.py:3737` | `slot` инициализируется до `try` — `UnboundLocalError` на битом 0x24 больше не выходит из приёмника | воспроизведение падения до правки |
 | `app.py:3690` | `_drain_midi_rx` обёрнут в `try/finally` — опрос MIDI не может молча остановиться | — |
 | `automation_metadata.py` | `AUTOMATION_ORDER` (23, порядок прибора), `STEP_PARAMETERS`; `NOISE` зарегистрирован как автоматизируемый; `VELOCITY` помечен как параметр шага | `tests/test_automation_order.py`, 7 тестов |

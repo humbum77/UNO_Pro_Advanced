@@ -101,7 +101,7 @@ DEST_BY_NAME = {x.name: x for x in DESTINATIONS}
 
 # Editor selector order.  Index into this list is a UI position only.
 MATRIX_DESTINATION_FILE_NAMES = tuple(x.name for x in DESTINATIONS_VISIBLE)
-MATRIX_SOURCE_FILE_NAMES = tuple(x.name for x in SOURCES)
+MATRIX_SOURCE_FILE_NAMES = tuple(x.name for x in sorted(SOURCES, key=lambda x: x.ui_index))
 
 
 def _get_bits(raw, start, width):

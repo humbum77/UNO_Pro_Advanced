@@ -21,10 +21,10 @@ from hardware_seq_0x29 import parse_0x29_response,apply_to_sequence
 from ui_layout import Viewport,split_columns,synth_columns,three_columns
 from live_creator.devices.uno.catalog_cache import load_cache as load_hardware_cache,save_cache as save_hardware_cache,utc_now as catalog_utc_now
 from live_creator.devices.uno.hardware_bank import CACHE_DIR as HARDWARE_PRESET_CACHE,load_bank as load_hardware_bank,local_entry as hardware_local_entry,physical_entry as hardware_physical_entry,reset_from_catalog as reset_hardware_bank,save_bank as save_hardware_bank
-from matrix_codec import MATRIX_DESTINATION_FILE_NAMES, decode_destination_file_id, decode_source_file_id, DEST_BY_FILE as MATRIX_DESTINATION_IDS, AMOUNT_MIN as MATRIX_AMOUNT_MIN, AMOUNT_MAX as MATRIX_AMOUNT_MAX
+from matrix_codec import MATRIX_DESTINATION_FILE_NAMES, MATRIX_SOURCE_FILE_NAMES, decode_destination_file_id, decode_source_file_id, DEST_BY_FILE as MATRIX_DESTINATION_IDS, AMOUNT_MIN as MATRIX_AMOUNT_MIN, AMOUNT_MAX as MATRIX_AMOUNT_MAX
 MATRIX_AMOUNT_RANGE=(MATRIX_AMOUNT_MIN,MATRIX_AMOUNT_MAX)
 
-MATRIX_SOURCES=['Velocity','Mod Wheel','Aftertouch','Key Pitch','Key Gate','Osc 1 Tune','Osc 1 Level','Osc 2 Tune','Osc 2 Level','Osc 3 Tune','Osc 3 Level','Noise','Filter 1 Cutoff','Filter 1 Res','Filter 2 Cutoff','Filter 2 Res','Filter Spacing','LFO 1','LFO 1 Fade In','LFO 2','LFO 2 Fade In','Filter Env','Amp Env','CV 1 IN','GATE 1 IN','CV 2 IN','GATE 2 IN','Accent','Gate','Tie','Filter Env Attack','Filter Env Decay','Filter Env Sustain','Filter Env Release','Amp Env Attack','Amp Env Decay','Amp Env Sustain','Amp Env Release']
+MATRIX_SOURCES=list(MATRIX_SOURCE_FILE_NAMES)
 MATRIX_DESTINATIONS=list(MATRIX_DESTINATION_FILE_NAMES)
 
 BG='#0d1114'; PANEL='#232a2f'; PANEL2='#22292f'; EDGE='#3b444a'; TEXT='#e7e9ea'; MUTED='#a8b0b6'; TEXT_LO='#5f686e'; LIGHT_GREY='#c9ced1'; ORANGE='#ff9d2e'; ORANGE2='#3a2a15'; BLUE='#4db8ff'; GREEN='#8ecb18'; RED='#d83a3a'; WHITE='#f5f5f5'; DIVIDER='#2a3138'; HOVER='#2b333a'; PRESSED='#2f373e'
