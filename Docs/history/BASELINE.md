@@ -8,13 +8,13 @@
 
 ```
 python -m compileall -q .                              # PASS
-python -m unittest discover -s tests -p "test_*.py"     # 144 tests
+python -m unittest discover -s tests -p "test_*.py"     # 154 tests
 ```
 
 ## Результат
 
 ```
-Ran 144 tests
+Ran 154 tests
 FAILED (failures=4, skipped=4)
 ```
 
@@ -40,6 +40,10 @@ test_unordered_automatable_parameters_are_registered_and_flagged` и
 test_menu_only_parameters_are_flagged_uncapturable` — 12 параметров, доступных
 только через меню прибора, помечены «чистый снимок невозможен» и не могут
 получить тесты на основе снимков.
+
+9 тестов добавлены 2026-09-29: `tests/test_tune_scale.py` фиксируют грамматику
+подписи шкалы TUNE, подтверждённую оператором. Подробности — в
+`Docs/history/TUNE_SCALE_2026-09-29.md`.
 
 Подробно:
 
@@ -88,6 +92,7 @@ width=1176 → pitch=72.2  total_width=4644  (x шага 64 = 4562)
 | `automation_metadata.py` | `AUTOMATION_NO_CAPTURE` — 12 параметров, доступных только через меню прибора; чистые снимки для них невозможны, тесты на них запрещены | `test_menu_only_parameters_are_flagged_uncapturable` |
 | `automation_metadata.py` | `FILTER ENV ATTACK/DECAY/SUSTAIN/RELEASE` зарегистрированы впервые (CC 53–56) | тот же тест |
 | `automation_metadata.py` | `FM 1`/`FM 2` переведены в группу неснимаемых; оба прочтения «filter fm» остаются зарегистрированы | тот же тест |
+| `automation_metadata.py` | `tune_label()` — грамматика подписи шкалы TUNE; `Parameter` получил `formatter` и `format()`; TUNE 1/2/3 переведены с `'st'` на приборную грамматику | `tests/test_tune_scale.py`, 9 тестов, полная лестница из 2401 значения |
 
 ## Проверка матрицы модуляции
 

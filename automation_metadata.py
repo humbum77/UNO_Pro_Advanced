@@ -1,6 +1,25 @@
 """Device UI metadata, never a MIDI or native entry encoder."""
 from dataclasses import dataclass
 
+def tune_label(semitones):
+    """TUNE display grammar, confirmed by the operator on 2026-09-29.
+
+    The scale runs ``0``, then ``1c``..``99c``, then ``1st``, then
+    ``1st1c``..``1st99c``, then ``2st`` and so on up to ``24st``, mirrored on
+    the negative side. The first hundred cents are read in cents and the rest
+    in semitones, which is what the manual describes and what the operator
+    confirmed automation accepts.
+
+    Values arrive in semitones carrying two decimals, so one step is one cent.
+    """
+    cents=round(float(semitones)*100)
+    if cents==0:return '0'
+    sign='-' if cents<0 else ''
+    whole,part=divmod(abs(cents),100)
+    if whole==0:return f'{sign}{part}c'
+    if part==0:return f'{sign}{whole}st'
+    return f'{sign}{whole}st{part}c'
+
 @dataclass(frozen=True)
 class Parameter:
     polarity: str
@@ -9,12 +28,22 @@ class Parameter:
     unit: str = ''
     labels: tuple = ()
     status: str = 'CONFIRMED UI RANGE'
+    formatter: object = None
     def fraction(self,value):
         return (value-self.minimum)/(self.maximum-self.minimum)
     def value(self,fraction):
         return round(self.minimum+fraction*(self.maximum-self.minimum),2)
+    def format(self,value):
+        if value is None:return None
+        if self.formatter is not None:return self.formatter(value)
+        return f'{value:g}{self.unit}' if self.unit else f'{value:g}'
     def scale_labels(self):
         if self.labels:return self.labels
+        if self.formatter is not None:
+            lo='UNKNOWN' if self.minimum is None else self.formatter(self.minimum)
+            hi='UNKNOWN' if self.maximum is None else self.formatter(self.maximum)
+            if self.polarity=='bipolar':return (hi,self.formatter(0),lo)
+            return (hi,lo)
         if self.minimum is None:return ('UNKNOWN',)
         return tuple(f'{v:g}' for v in (self.maximum,(self.maximum+self.minimum)/2,self.minimum))
 
@@ -24,12 +53,12 @@ PARAMETERS={}
 UNORDERED='AUTOMATABLE: order position UNKNOWN'
 NO_CAPTURE=('AUTOMATABLE: order position UNKNOWN; no clean capture possible, '
             'reached through the instrument menu')
-def add(names,polarity,lo,hi,unit='',labels=(),status='CONFIRMED UI RANGE'):
-    for name in names:PARAMETERS[name]=Parameter(polarity,lo,hi,unit,labels,status)
+def add(names,polarity,lo,hi,unit='',labels=(),status='CONFIRMED UI RANGE',formatter=None):
+    for name in names:PARAMETERS[name]=Parameter(polarity,lo,hi,unit,labels,status,formatter)
 add(['CUTOFF 1','CUTOFF 2'],'unipolar',0,512)
 add(['RESONANCE 1','RESONANCE 2'],'unipolar',0,127)
 add(['LEVEL 1','LEVEL 2','LEVEL 3'],'unipolar',0,100)
-add(['TUNE 1','TUNE 2','TUNE 3'],'bipolar',-24,24,'st',('+24 st','0','-24 st'),'PARTIAL: hybrid cents/semitone interpolation unknown')
+add(['TUNE 1','TUNE 2','TUNE 3'],'bipolar',-24,24,formatter=tune_label,status='CONFIRMED hybrid cents/semitone scale: 0, 1c..99c, 1st, 1st1c..1st99c, 2st .. 24st, mirrored negative. Automation native byte encoding of this scale is NOT yet determined')
 add(['LFO 1','LFO 2'],'unipolar',0.01,99,'Hz',('99 Hz','49.5 Hz','0.01 Hz'),'PARTIAL: free-Hz only; sync mapping separate')
 add(['WAVE 1','WAVE 2','WAVE 3'],'unipolar',None,None,labels=('UNKNOWN',),status='PARTIAL: normalized wave scale unknown')
 add(['NOISE'],'unipolar',0,127,status='CONFIRMED parameter UI; held-Step Automation')
