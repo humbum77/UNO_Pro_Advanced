@@ -8,13 +8,13 @@
 
 ```
 python -m compileall -q .                              # PASS
-python -m unittest discover -s tests -p "test_*.py"     # 141 tests
+python -m unittest discover -s tests -p "test_*.py"     # 143 tests
 ```
 
 ## Результат
 
 ```
-Ran 141 tests
+Ran 143 tests
 FAILED (failures=4, skipped=4)
 ```
 
@@ -29,6 +29,12 @@ FAILED (failures=4, skipped=4)
 1 тест добавлен 2026-09-29: `test_step_automation_integration.
 test_instrument_produces_more_than_sixteen_lanes` фиксирует, что прибор пишет
 17 полос на шаг, и пропускается, если съёмки `AUTO_L2.unosyp` нет рядом.
+
+2 теста добавлены 2026-09-29: `test_automation_order.
+test_unordered_automatable_parameters_are_registered_and_flagged` и
+`test_panel_appends_unordered_after_the_confirmed_order` — набор
+автоматизируемых параметров шире подтверждённых 23; позиции остальных помечены
+`UNKNOWN` и не выдаются за подтверждённые.
 
 Подробно:
 
@@ -72,6 +78,8 @@ width=1176 → pitch=72.2  total_width=4644  (x шага 64 = 4562)
 | `automation_metadata.py` | `MAX_AUTOMATION_LANES_PER_STEP=20` — единственный источник истины для предела полос на шаг | `test_device_limit_is_twenty_entries` сверяет все четыре места |
 | `app.py:3200,3201,3209` | кап 16 заменён на константу; **16 отказывал прибору** — `AUTO_L2.unosyp` даёт 17 полос на шаге 1 | `test_instrument_produces_more_than_sixteen_lanes` |
 | `uno_step_automation_decoder.py`, `native_automation.py` | предел берётся из общей константы вместо двух хардкодов | разбор 294 файлов при границах 18 и 20 даёт идентичный результат |
+| `automation_metadata.py` | `AUTOMATION_UNORDERED` — 15 автоматизируемых параметров вне бенчмарка, все со статусом `AUTOMATABLE: order position UNKNOWN`; статус `FM 1`/`FM 2` исправлен с «не автоматизируется» | 2 теста в `test_automation_order.py` |
+| `app.py:15` | импорт `MAX_AUTOMATION_LANES_PER_STEP` | — |
 
 ## Проверка матрицы модуляции
 

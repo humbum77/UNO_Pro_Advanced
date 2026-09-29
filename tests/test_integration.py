@@ -67,7 +67,8 @@ class IntegrationTests(unittest.TestCase):
   s.update(20);self.assertLessEqual(s.current_step,10)
   s.toggle(20);s.update(30);self.assertFalse(s.active)
  def test_metadata(self):
-  self.assertEqual(len(AUTOMATION_ORDER),23);self.assertIn('VELOCITY',AUTOMATABLE);self.assertNotIn('VELOCITY',AUTOMATION_ORDER);self.assertIn('NOISE',AUTOMATION_ORDER);self.assertNotIn('FM 1',AUTOMATABLE);self.assertNotIn('KEYTRACKING',AUTOMATABLE)
+  self.assertEqual(len(AUTOMATION_ORDER),23);self.assertIn('VELOCITY',AUTOMATABLE);self.assertNotIn('VELOCITY',AUTOMATION_ORDER);self.assertIn('NOISE',AUTOMATION_ORDER);self.assertNotIn('KEYTRACKING',AUTOMATABLE)
+  self.assertIn('FM 1',AUTOMATABLE)
   self.assertEqual(PARAMETERS['SPACING'].scale_labels(),('64','0','-64'))
   self.assertEqual(PARAMETERS['CUTOFF 1'].scale_labels(),('512','256','0'))
   seq=Sequence();self.assertIs(parameter_line(seq,'LEVEL 3'),parameter_line(seq,'LEVEL 3'))

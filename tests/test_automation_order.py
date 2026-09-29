@@ -59,9 +59,31 @@ class AutomationOrder(unittest.TestCase):
         self.assertIn("NOT a held-Step Automation lane",
                       automation_metadata.PARAMETERS["VELOCITY"].status)
 
-    def test_panel_list_is_the_device_order_plus_velocity(self):
-        self.assertEqual(automation_metadata.AUTOMATABLE,
-                         automation_metadata.AUTOMATION_ORDER + ("VELOCITY",))
+    def test_confirmed_order_leads_the_panel(self):
+        panel = automation_metadata.AUTOMATABLE
+        self.assertEqual(panel[:len(EXPECTED)],
+                         tuple(GUI_NAME[n] for n in EXPECTED))
+
+    def test_unordered_automatable_parameters_are_registered_and_flagged(self):
+        unordered = automation_metadata.AUTOMATION_UNORDERED
+        self.assertTrue(unordered)
+        for name in unordered:
+            self.assertIn(name, automation_metadata.PARAMETERS)
+            self.assertIn("order position UNKNOWN",
+                          automation_metadata.PARAMETERS[name].status)
+            # they must not be silently presented as ordered
+            self.assertNotIn(name, automation_metadata.AUTOMATION_ORDER)
+        # FM 1/FM 2 were previously marked as not automatable
+        self.assertNotIn("NOT held-Step Automation",
+                         automation_metadata.PARAMETERS["FM 1"].status)
+
+    def test_panel_appends_unordered_after_the_confirmed_order(self):
+        self.assertEqual(
+            automation_metadata.AUTOMATABLE[:len(automation_metadata.AUTOMATION_ORDER)],
+            automation_metadata.AUTOMATION_ORDER)
+        self.assertEqual(set(automation_metadata.AUTOMATABLE),
+                         set(automation_metadata.AUTOMATION_ORDER) | {"VELOCITY"}
+                         | set(automation_metadata.AUTOMATION_UNORDERED))
 
     def test_every_automation_parameter_has_metadata(self):
         for name in automation_metadata.AUTOMATION_ORDER:
