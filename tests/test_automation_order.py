@@ -65,25 +65,46 @@ class AutomationOrder(unittest.TestCase):
                          tuple(GUI_NAME[n] for n in EXPECTED))
 
     def test_unordered_automatable_parameters_are_registered_and_flagged(self):
-        unordered = automation_metadata.AUTOMATION_UNORDERED
-        self.assertTrue(unordered)
-        for name in unordered:
+        for name in automation_metadata.AUTOMATION_UNORDERED:
             self.assertIn(name, automation_metadata.PARAMETERS)
             self.assertIn("order position UNKNOWN",
                           automation_metadata.PARAMETERS[name].status)
-            # they must not be silently presented as ordered
+            self.assertNotIn("no clean capture possible",
+                             automation_metadata.PARAMETERS[name].status)
             self.assertNotIn(name, automation_metadata.AUTOMATION_ORDER)
         # FM 1/FM 2 were previously marked as not automatable
         self.assertNotIn("NOT held-Step Automation",
                          automation_metadata.PARAMETERS["FM 1"].status)
 
-    def test_panel_appends_unordered_after_the_confirmed_order(self):
+    def test_menu_only_parameters_are_flagged_uncapturable(self):
+        for name in automation_metadata.AUTOMATION_NO_CAPTURE:
+            self.assertIn(name, automation_metadata.PARAMETERS)
+            status = automation_metadata.PARAMETERS[name].status
+            self.assertIn("order position UNKNOWN", status)
+            self.assertIn("no clean capture possible", status)
+            self.assertNotIn(name, automation_metadata.AUTOMATION_ORDER)
+        # the reported groups must all be present
+        for name in ("OSC 2 SYNC", "OSC 3 SYNC", "RING", "FILTER 1 MODE",
+                     "FILTER 2 MODE", "FILTER 1 KEY TRACKING",
+                     "FILTER 2 KEY TRACKING", "GLIDE"):
+            self.assertIn(name, automation_metadata.AUTOMATION_NO_CAPTURE)
+        # both readings of "filter fm" stay registered and flagged
+        for name in ("FM 1", "FM 2", "FILTER 1 ENV AMOUNT",
+                     "FILTER 2 ENV AMOUNT"):
+            self.assertIn(name, automation_metadata.AUTOMATION_NO_CAPTURE)
+
+    def test_the_two_unordered_groups_are_disjoint(self):
         self.assertEqual(
-            automation_metadata.AUTOMATABLE[:len(automation_metadata.AUTOMATION_ORDER)],
-            automation_metadata.AUTOMATION_ORDER)
-        self.assertEqual(set(automation_metadata.AUTOMATABLE),
+            set(automation_metadata.AUTOMATION_UNORDERED)
+            & set(automation_metadata.AUTOMATION_NO_CAPTURE), set())
+        panel = set(automation_metadata.AUTOMATABLE)
+        self.assertEqual(panel,
                          set(automation_metadata.AUTOMATION_ORDER) | {"VELOCITY"}
-                         | set(automation_metadata.AUTOMATION_UNORDERED))
+                         | set(automation_metadata.AUTOMATION_UNORDERED)
+                         | set(automation_metadata.AUTOMATION_NO_CAPTURE))
+        # every automatable parameter fits under the per-step lane limit in
+        # aggregate, and none of them claims a confirmed order
+        self.assertGreater(automation_metadata.MAX_AUTOMATION_LANES_PER_STEP, 0)
 
     def test_every_automation_parameter_has_metadata(self):
         for name in automation_metadata.AUTOMATION_ORDER:

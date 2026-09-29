@@ -8,13 +8,13 @@
 
 ```
 python -m compileall -q .                              # PASS
-python -m unittest discover -s tests -p "test_*.py"     # 143 tests
+python -m unittest discover -s tests -p "test_*.py"     # 144 tests
 ```
 
 ## Результат
 
 ```
-Ran 143 tests
+Ran 144 tests
 FAILED (failures=4, skipped=4)
 ```
 
@@ -35,6 +35,11 @@ test_unordered_automatable_parameters_are_registered_and_flagged` и
 `test_panel_appends_unordered_after_the_confirmed_order` — набор
 автоматизируемых параметров шире подтверждённых 23; позиции остальных помечены
 `UNKNOWN` и не выдаются за подтверждённые.
+
+1 тест добавлен 2026-09-29: `test_automation_order.
+test_menu_only_parameters_are_flagged_uncapturable` — 12 параметров, доступных
+только через меню прибора, помечены «чистый снимок невозможен» и не могут
+получить тесты на основе снимков.
 
 Подробно:
 
@@ -80,6 +85,9 @@ width=1176 → pitch=72.2  total_width=4644  (x шага 64 = 4562)
 | `uno_step_automation_decoder.py`, `native_automation.py` | предел берётся из общей константы вместо двух хардкодов | разбор 294 файлов при границах 18 и 20 даёт идентичный результат |
 | `automation_metadata.py` | `AUTOMATION_UNORDERED` — 15 автоматизируемых параметров вне бенчмарка, все со статусом `AUTOMATABLE: order position UNKNOWN`; статус `FM 1`/`FM 2` исправлен с «не автоматизируется» | 2 теста в `test_automation_order.py` |
 | `app.py:15` | импорт `MAX_AUTOMATION_LANES_PER_STEP` | — |
+| `automation_metadata.py` | `AUTOMATION_NO_CAPTURE` — 12 параметров, доступных только через меню прибора; чистые снимки для них невозможны, тесты на них запрещены | `test_menu_only_parameters_are_flagged_uncapturable` |
+| `automation_metadata.py` | `FILTER ENV ATTACK/DECAY/SUSTAIN/RELEASE` зарегистрированы впервые (CC 53–56) | тот же тест |
+| `automation_metadata.py` | `FM 1`/`FM 2` переведены в группу неснимаемых; оба прочтения «filter fm» остаются зарегистрированы | тот же тест |
 
 ## Проверка матрицы модуляции
 
