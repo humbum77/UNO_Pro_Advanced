@@ -8,13 +8,13 @@
 
 ```
 python -m compileall -q .                              # PASS
-python -m unittest discover -s tests -p "test_*.py"     # 154 tests
+python -m unittest discover -s tests -p "test_*.py"     # 158 tests
 ```
 
 ## Результат
 
 ```
-Ran 154 tests
+Ran 158 tests
 FAILED (failures=4, skipped=4)
 ```
 
@@ -44,6 +44,12 @@ test_menu_only_parameters_are_flagged_uncapturable` — 12 параметров,
 9 тестов добавлены 2026-09-29: `tests/test_tune_scale.py` фиксируют грамматику
 подписи шкалы TUNE, подтверждённую оператором. Подробности — в
 `Docs/history/TUNE_SCALE_2026-09-29.md`.
+
+4 теста добавлены 2026-09-29: `test_tune_scale.TuneNativeCodec` фиксируют
+кодек TUNE (2 байта, старшим первым, центы), выразимость полосы
+`1st1c`..`1st99c`, чтение `пара/16 = центы` по смещению `0x01F1` на контрольных
+съёмках `99C`/`1ST`/`2ST` и наличие значения 146c (`1st46c`) в `DHK_Y.unosyp`.
+Последние два пропускаются, если съёмок рядом нет.
 
 Подробно:
 
