@@ -8,13 +8,13 @@
 
 ```
 python -m compileall -q .                              # PASS
-python -m unittest discover -s tests -p "test_*.py"     # 140 tests
+python -m unittest discover -s tests -p "test_*.py"     # 141 tests
 ```
 
 ## Результат
 
 ```
-Ran 140 tests
+Ran 141 tests
 FAILED (failures=4, skipped=4)
 ```
 
@@ -25,6 +25,10 @@ FAILED (failures=4, skipped=4)
 7 тестов добавлены 2026-09-29: `tests/test_automation_order.py` фиксирует
 подтверждённый порядок автоматизации прибора. Подробности — в
 `Docs/history/PARAMETER_SELECTION_2026-09-29.md`, раздел 7.
+
+1 тест добавлен 2026-09-29: `test_step_automation_integration.
+test_instrument_produces_more_than_sixteen_lanes` фиксирует, что прибор пишет
+17 полос на шаг, и пропускается, если съёмки `AUTO_L2.unosyp` нет рядом.
 
 Подробно:
 
@@ -65,6 +69,9 @@ width=1176 → pitch=72.2  total_width=4644  (x шага 64 = 4562)
 | `automation_metadata.py` | `AUTOMATION_ORDER` (23, порядок прибора), `STEP_PARAMETERS`; `NOISE` зарегистрирован как автоматизируемый; `VELOCITY` помечен как параметр шага | `tests/test_automation_order.py`, 7 тестов |
 | `uno_step_automation_decoder.py` | `NOISE` перенесён с позиции 22 на позицию 9, между `LEVEL3` и `CUTOFF1`; порядок вынесен в `DECODER_PARAMETER_ORDER` | `tests/test_automation_order.py` |
 | `tests/test_integration.py` | `test_no_guessed_automation_sends` обращается к полосе по имени `CUTOFF 1`, а не по индексу 0 | тест перестал зависеть от порядка списка |
+| `automation_metadata.py` | `MAX_AUTOMATION_LANES_PER_STEP=20` — единственный источник истины для предела полос на шаг | `test_device_limit_is_twenty_entries` сверяет все четыре места |
+| `app.py:3200,3201,3209` | кап 16 заменён на константу; **16 отказывал прибору** — `AUTO_L2.unosyp` даёт 17 полос на шаге 1 | `test_instrument_produces_more_than_sixteen_lanes` |
+| `uno_step_automation_decoder.py`, `native_automation.py` | предел берётся из общей константы вместо двух хардкодов | разбор 294 файлов при границах 18 и 20 даёт идентичный результат |
 
 ## Проверка матрицы модуляции
 

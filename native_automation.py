@@ -1,5 +1,7 @@
 """Step Automation decoding, lane integration and guarded native value writing."""
 
+from automation_metadata import MAX_AUTOMATION_LANES_PER_STEP
+
 PARAMETER_TO_LANE = {
     'WAVE1': 'WAVE 1', 'TUNE1': 'TUNE 1', 'WAVE2': 'WAVE 2',
     'TUNE2': 'TUNE 2', 'WAVE3': 'WAVE 3', 'TUNE3': 'TUNE 3',
@@ -32,7 +34,8 @@ def normalize_decoded(native):
             'pages_match': native.get('pages_match', False),
             'profile': native.get('profile'), 'entries': entries,
             'mapping': native.get('status', ''),
-            'records': native.get('records', []), 'maximum_entries': 18}
+            'records': native.get('records', []),
+            'maximum_entries': MAX_AUTOMATION_LANES_PER_STEP}
 
 
 def apply_decoded_to_sequence(sequence, native):

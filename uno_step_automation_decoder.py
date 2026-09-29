@@ -12,6 +12,8 @@ import json
 import struct
 from pathlib import Path
 
+from automation_metadata import MAX_AUTOMATION_LANES_PER_STEP
+
 PAGE_OFFSET = 297
 CORE_LENGTH = 192
 MASTER_VALUES = (
@@ -22,7 +24,7 @@ MASTER_VALUES = (
     ("DRIVE", "42"), ("MOD", "4d"), ("DELAY", "58"), ("REVERB", "63"),
 )
 MASTER_PAYLOAD = bytes.fromhex("".join(value for _, value in MASTER_VALUES))
-MAX_ENTRIES_PER_STEP = 18
+MAX_ENTRIES_PER_STEP = MAX_AUTOMATION_LANES_PER_STEP
 # Held-Step Automation order, confirmed by the operator on 2026-09-29.
 # NOISE is automatable and sits between LEVEL3 and CUTOFF1.
 PARAMETERS = {

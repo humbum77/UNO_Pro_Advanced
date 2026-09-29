@@ -45,6 +45,13 @@ AUTOMATION_ORDER=('WAVE 1','TUNE 1','WAVE 2','TUNE 2','WAVE 3','TUNE 3',
 STEP_PARAMETERS=('GATE','ACC','TIE','VELOCITY','LENGTH')
 # Panel order: the device order, with the step parameter VELOCITY kept available.
 AUTOMATABLE=AUTOMATION_ORDER+('VELOCITY',)
+# Maximum automation lanes on one step. Confirmed by the operator 2026-09-29.
+# Single source of truth: the canonical decoder, the native container and the
+# editor cap used to disagree (18, 18 and 16). AUTO_L2.unosyp decodes to 17
+# lanes on step 1, so a 16 cap refuses a file the instrument itself produced.
+# A step also carries 3 notes plus the step parameters GATE, ACC, TIE, VELOCITY
+# and LENGTH; those are per-step, not automation lanes.
+MAX_AUTOMATION_LANES_PER_STEP=20
 
 def empty_lines():
     return [{'parameter':name,'values':[None]*64,'units':'device-ui'} for name in AUTOMATABLE]

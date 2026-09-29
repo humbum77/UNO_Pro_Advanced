@@ -4,6 +4,7 @@ import struct
 import unittest
 from pathlib import Path
 
+from automation_metadata import MAX_AUTOMATION_LANES_PER_STEP
 from native_automation import read_automation
 from uno_step_automation_decoder import MASTER_PAYLOAD
 from uno_step_automation_decoder import decode as decode_step_automation
@@ -58,9 +59,28 @@ class AutomationIntegrationTest(unittest.TestCase):
             self.assertEqual([item['name'] for item in decoded['parameters']],names)
             self.assertTrue(decoded['pages_match'])
 
-    def test_device_limit_is_eighteen_entries(self):
+    def test_device_limit_is_twenty_entries(self):
+        # Confirmed by the operator 2026-09-29: 20 automation parameters fit on
+        # one step. The value lives in one place; the decoder, the native
+        # container and the editor cap must not drift apart again.
+        from automation_metadata import MAX_AUTOMATION_LANES_PER_STEP
         from uno_step_automation_decoder import MAX_ENTRIES_PER_STEP
-        self.assertEqual(MAX_ENTRIES_PER_STEP,18)
+        import native_automation
+        self.assertEqual(MAX_AUTOMATION_LANES_PER_STEP,20)
+        self.assertEqual(MAX_ENTRIES_PER_STEP,MAX_AUTOMATION_LANES_PER_STEP)
+        self.assertEqual(native_automation.MAX_AUTOMATION_LANES_PER_STEP,20)
+        import app
+        self.assertEqual(app.MAX_AUTOMATION_LANES_PER_STEP,20)
+
+    def test_instrument_produces_more_than_sixteen_lanes(self):
+        # AUTO_L2.unosyp carries 17 automation lanes on step 1, so any editor
+        # cap below 17 refuses a file the instrument itself wrote.
+        path=Path(r'D:\UNO\unosyp\AUTO_L2.unosyp')
+        if not path.exists():self.skipTest('instrument capture not present')
+        decoded=decode_step_automation(path.read_bytes())
+        self.assertEqual(decoded['count'],17)
+        self.assertGreater(decoded['count'],16)
+        self.assertLessEqual(decoded['count'],MAX_AUTOMATION_LANES_PER_STEP)
 
     def test_editor_json_sequence_is_auto_detected(self):
         steps=[{'notes':[],'note_velocities':[]} for _ in range(64)]

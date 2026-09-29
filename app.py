@@ -12,7 +12,7 @@ from data_model import Preset,Song,SongSlot,Sequence
 import storage
 import ui_theme
 from ui_theme import widgets as tk
-from automation_metadata import AUTOMATABLE,PARAMETERS,parameter_line,display_value
+from automation_metadata import AUTOMATABLE,MAX_AUTOMATION_LANES_PER_STEP,PARAMETERS,parameter_line,display_value
 from midi_engine import MidiEngine
 from protocol_map import *
 from state_decoder import decode_state_0x37
@@ -3197,8 +3197,8 @@ class App(tk.Tk):
   if prospective:active.add(str(prospective))
   return len(active)
  def _automation_limit_notice(self):
-  self.status='Automation limit: maximum 16 parameters per step'
-  try:messagebox.showwarning('Automation limit','Maximum 16 automation parameters per step.')
+  self.status=f'Automation limit: maximum {MAX_AUTOMATION_LANES_PER_STEP} parameters per step'
+  try:messagebox.showwarning('Automation limit',f'Maximum {MAX_AUTOMATION_LANES_PER_STEP} automation parameters per step.')
   except Exception:pass
  def _modlane_step(self,x,y,d):
   gx,gy,gw,gh,visible=d['gx'],d['gy'],d['gw'],d['gh'],d['visible'];col=int(clamp((x-gx)/(gw/visible),0,visible-1));s=d.get('first',0)+col;t=clamp(1-(y-gy)/gh,0,1)
@@ -3206,7 +3206,7 @@ class App(tk.Tk):
   if metadata.minimum is None or lane.get('units')!='device-ui':return
   vals=lane.setdefault('values',[None]*64)
   while len(vals)<64:vals.append(None)
-  if vals[s] is None and self._automation_count_for_step(s,lane['parameter'])>16:
+  if vals[s] is None and self._automation_count_for_step(s,lane['parameter'])>MAX_AUTOMATION_LANES_PER_STEP:
    self._automation_limit_notice();self.redraw();return
   vals[s]=metadata.value(t)
   if lane.get('_step_velocity'):
